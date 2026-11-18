@@ -3,7 +3,6 @@ var CAMERA_LAG = 0.9;
 var COLLISION = 1.1;
 var BOUNCE = 0.7;
 var mapscale = 5;
-var VR = false;
 var BOUNCE_CORRECT = 0.01;
 var WALL_SIZE = 1.2;
 var MOUNTAIN_DIST = 250;
@@ -12,236 +11,6 @@ var LAPS = 3;
 function MODS(){
 
 }
-
-var serverList = [
-	{
-		apiKey: "AIzaSyDiJsMLlix5o9XqPW1EpeBvuA15XNjlR8M",
-		authDomain: "car-game-a86b9.firebaseapp.com",
-		databaseURL: "https://car-game-a86b9.firebaseio.com",
-		projectId: "car-game-a86b9",
-		storageBucket: "car-game-a86b9.appspot.com",
-		messagingSenderId: "722396856191",
-		appId: "1:722396856191:web:fb5f72917856108a50e44a"
-	},
-	{
-		apiKey: "AIzaSyCsqpn0aTDqU8ffGVE284fmSEOTK2tOgq8",
-		authDomain: "car-game-backup.firebaseapp.com",
-		databaseURL: "https://car-game-backup.firebaseio.com",
-		projectId: "car-game-backup",
-		storageBucket: "car-game-backup.appspot.com",
-		messagingSenderId: "1015722732476"
-	},
-	{
-		apiKey: "AIzaSyDNuMPH_bg8Orkndl8Md6lUh_EOS3pitGs",
-		authDomain: "car-game-backup-2.firebaseapp.com",
-		databaseURL: "https://car-game-backup-2-default-rtdb.firebaseio.com",
-		projectId: "car-game-backup-2",
-		storageBucket: "car-game-backup-2.appspot.com",
-		messagingSenderId: "250860288006",
-		appId: "1:250860288006:web:9df8ed3929e7fceb2d2b87"
-	},
-	{
-		apiKey: "AIzaSyCmfz7RvzLaAo4xIxA-sH3qhXuGQZYMuvE",
-		authDomain: "car-game-backup-3.firebaseapp.com",
-		databaseURL: "https://car-game-backup-3-default-rtdb.firebaseio.com",
-		projectId: "car-game-backup-3",
-		storageBucket: "car-game-backup-3.appspot.com",
-		messagingSenderId: "477326457153",
-		appId: "1:477326457153:web:421821136bcc6a67f149c0"
-	},
-	{
-		apiKey: "AIzaSyAerrEq1YUJNZnvQhZvyRa6LOS9VyhEYvs",
-		authDomain: "car-game-backup-4.firebaseapp.com",
-		databaseURL: "https://car-game-backup-4-default-rtdb.firebaseio.com",
-		projectId: "car-game-backup-4",
-		storageBucket: "car-game-backup-4.appspot.com",
-		messagingSenderId: "802151922986",
-		appId: "1:802151922986:web:69b9ff0ad8778d51da7253"
-	},
-	{
-		apiKey: "AIzaSyCdVFLbMypdHR60NqXYs_qSpAdvvgpo9Ig",
-		authDomain: "car-game-backup-5.firebaseapp.com",
-		databaseURL: "https://car-game-backup-5-default-rtdb.firebaseio.com",
-		projectId: "car-game-backup-5",
-		storageBucket: "car-game-backup-5.appspot.com",
-		messagingSenderId: "743331533949",
-		appId: "1:743331533949:web:a724977f309c1583400d14"
-	},
-	{
-		apiKey: "AIzaSyDRmEJMfrk_y1-BLjgaD6ctaDfP8tKSyfA",
-		authDomain: "car-game-backup-6.firebaseapp.com",
-		databaseURL: "https://car-game-backup-6-default-rtdb.firebaseio.com",
-		projectId: "car-game-backup-6",
-		storageBucket: "car-game-backup-6.appspot.com",
-		messagingSenderId: "1025140224576",
-		appId: "1:1025140224576:web:cb239ab3773cb7596125a5"
-	},
-	{
-		apiKey: "AIzaSyA1y6TdFz2F0oahE-HmkA0mTAROlgIytR4",
-		authDomain: "car-game-backup-7.firebaseapp.com",
-		databaseURL: "https://car-game-backup-7-default-rtdb.firebaseio.com",
-		projectId: "car-game-backup-7",
-		storageBucket: "car-game-backup-7.appspot.com",
-		messagingSenderId: "1012238241918",
-		appId: "1:1012238241918:web:d4188393dcd596b6a6882f"
-	}
-];
-
-var database, connectedN = -1, connectedS = undefined;
-for(var i = 0; i < serverList.length; i++){
-	firebase.initializeApp(serverList[i], "server" + i);
-	let li = i;
-	let la = firebase.apps[i];
-	if(i == 0){
-		try{
-			la.analytics();
-		}catch{}
-	}
-    	let tm = setTimeout(function(){
-    	    la.delete();
-    	}, 5000);
-	la.auth().signInAnonymously().then(() => {
-		database = la.database();
-		database.ref("/testServer").once("value", function(e){
-            		clearTimeout(tm);
-			if(connectedN >= 0 && connectedN > li)
-				connectedS.delete();
-			if(connectedN < 0 || connectedN > li){
-				database = la.database();
-				connectedN = li;
-				connectedS = la;
-			}else{
-				la.delete();
-			}
-		}, function(e){
-			la.delete();
-		});
-	}, function(e){
-		la.delete();
-	});
-}
-
-/*var config = {
-	apiKey: "AIzaSyDiJsMLlix5o9XqPW1EpeBvuA15XNjlR8M",
-	authDomain: "car-game-a86b9.firebaseapp.com",
-	databaseURL: "https://car-game-a86b9.firebaseio.com",
-	projectId: "car-game-a86b9",
-	storageBucket: "car-game-a86b9.appspot.com",
-	messagingSenderId: "722396856191",
-	appId: "1:722396856191:web:fb5f72917856108a50e44a"
-}*/
-
-
-setTimeout(function(){
-	document.getElementById("title").style.transform = "none";
-}, 500);
-setTimeout(function(){
-	document.getElementsByClassName("menuitem")[0].style.transform = "none";
-}, 1000);
-setTimeout(function(){
-	document.getElementsByClassName("menuitem")[1].style.transform = "none";
-}, 1200);
-setTimeout(function(){
-	document.getElementsByClassName("menuitem")[2].style.transform = "none";
-}, 1400);
-setTimeout(function(){
-	document.getElementById("mywebsitelink").style.transform = "none";
-}, 1600);
-setTimeout(function(){
-	document.getElementById("settings").style.transform = "none";
-}, 1800);
-/*var connected = -1;
-/*var config = {
-	apiKey: "AIzaSyDiJsMLlix5o9XqPW1EpeBvuA15XNjlR8M",
-	authDomain: "car-game-a86b9.firebaseapp.com",
-	databaseURL: "https://car-game-a86b9.firebaseio.com",
-	projectId: "car-game-a86b9",
-	storageBucket: "car-game-a86b9.appspot.com",
-	messagingSenderId: "722396856191"
-};
-firebase.initializeApp(config);
-var database = firebase.database();
-try{
-	firebase.analytics();
-}catch(e){ console.log("Analytics were blocked :("); }
-
-
-database.ref("/testServer").once("value", function(e){
-	if(connected < 0 || connected > 0){
-		database = firebase.apps[0].database();
-		connected = 0;
-	}
-});
-
-config = {
-	apiKey: "AIzaSyCsqpn0aTDqU8ffGVE284fmSEOTK2tOgq8",
-	authDomain: "car-game-backup.firebaseapp.com",
-	databaseURL: "https://car-game-backup.firebaseio.com",
-	projectId: "car-game-backup",
-	storageBucket: "car-game-backup.appspot.com",
-	messagingSenderId: "1015722732476"
-};
-firebase.initializeApp(config, "backup");
-database = firebase.apps[1].database();
-database.ref("/testServer").once("value", function(e){
-	if(connected < 0 || connected > 1){
-		database = firebase.apps[1].database();
-		connected = 1;
-	}
-});
-
-config = {
-	apiKey: "AIzaSyDNuMPH_bg8Orkndl8Md6lUh_EOS3pitGs",
-	authDomain: "car-game-backup-2.firebaseapp.com",
-	databaseURL: "https://car-game-backup-2-default-rtdb.firebaseio.com",
-	projectId: "car-game-backup-2",
-	storageBucket: "car-game-backup-2.appspot.com",
-	messagingSenderId: "250860288006",
-	appId: "1:250860288006:web:9df8ed3929e7fceb2d2b87"
-};
-firebase.initializeApp(config, "backup2");
-database = firebase.apps[2].database();
-database.ref("/testServer").once("value", function(e){
-	if(connected < 0 || connected > 2){
-		database = firebase.apps[2].database();
-		connected = 2;
-	}
-});
-
-config = {
-	apiKey: "AIzaSyCmfz7RvzLaAo4xIxA-sH3qhXuGQZYMuvE",
-	authDomain: "car-game-backup-3.firebaseapp.com",
-	databaseURL: "https://car-game-backup-3-default-rtdb.firebaseio.com",
-	projectId: "car-game-backup-3",
-	storageBucket: "car-game-backup-3.appspot.com",
-	messagingSenderId: "477326457153",
-	appId: "1:477326457153:web:421821136bcc6a67f149c0"
-};
-firebase.initializeApp(config, "backup3");
-database = firebase.apps[3].database();
-database.ref("/testServer").once("value", function(e){
-	if(connected < 0 || connected > 3){
-		database = firebase.apps[3].database();
-		connected = 3;
-	}
-});
-
-config = {
-	apiKey: "AIzaSyAerrEq1YUJNZnvQhZvyRa6LOS9VyhEYvs",
-	authDomain: "car-game-backup-4.firebaseapp.com",
-	projectId: "car-game-backup-4",
-	storageBucket: "car-game-backup-4.appspot.com",
-	messagingSenderId: "802151922986",
-	appId: "1:802151922986:web:69b9ff0ad8778d51da7253"
-};
-firebase.initializeApp(config, "backup4");
-database = firebase.apps[4].database();
-database.ref("/testServer").once("value", function(e){
-	if(connected < 0 || connected > 4){
-		database = firebase.apps[4].database();
-		connected = 4;
-	}
-}); */
 
 if(top != self) {
 	document.getElementById("warning").style.display = "block";
@@ -252,8 +21,6 @@ function forceScroll(){
 	window.scrollTo(0, 0);
 }
 forceScroll();
-
-//var database = firebase.database();
 
 var camera, renderer, scene, renderer2, scene2, labels = [];
 scene = new THREE.Scene();
@@ -266,7 +33,6 @@ if(!mobile){
 	renderer.shadowMap.autoUpdate = false;
 	renderer.shadowMap.needsUpdate = true;
 	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-	document.getElementById("cardboard").className += " disabled";
 	console.log(mobile);
 }
 var element = renderer.domElement;
@@ -340,7 +106,6 @@ menu2 = function(){
 		name = "Nerd with No Name";
 	else
 		name = document.getElementById("name").value;
-	VR = document.getElementById("cardboard").className == "tools sel";
 	f.style.transform = "translate3d(0, -100vh, 0)";
 	setTimeout(function(){
 		f.innerHTML = "<div class='menuitem title button' id='host' ontouchstart='this.click()' onclick='host()'>Host a game</div><div class='menuitem title button' ontouchstart='this.click()' id='join' onclick='joinGame()'>Join a game</div>";
@@ -360,147 +125,261 @@ menu2 = function(){
 	}, 500);
 }
 
+var PEER_PREFIX = "cars-game-";
+var CODE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+var net = {peer: null, conns: {}, hostConn: null, isHost: false, status: 0};
+
+function broadcast(msg, except){
+	for(var id in net.conns){
+		if(id !== except && net.conns[id].open)
+			net.conns[id].send(msg);
+	}
+}
+
+function snapshot(){
+	var out = {};
+	for(var id in players)
+		out[id] = players[id].data;
+	return out;
+}
+
+function sendMe(){
+	if(net.isHost)
+		broadcast({t: "u", id: me.id, d: me.data});
+	else if(net.hostConn && net.hostConn.open)
+		net.hostConn.send({t: "u", d: me.data});
+}
+
+function newPlayerData(){
+	return {
+		x: 0,
+		y: 0,
+		xv: 0,
+		yv: 0,
+		dir: 0,
+		steer: 0,
+		color: color,
+		name: name,
+		checkpoint: 1,
+		lap: 0,
+		collision: {}
+	};
+}
+
+function addPlayer(id, data, mine){
+	if(players[id])
+		return;
+	var pl = players[id] = {
+		data: data,
+		model: new THREE.Mesh(new THREE.BoxBufferGeometry(1, 1, 2))
+	};
+	pl.model.position.set(pl.data.x, 0.6, pl.data.y);
+	pl.model.material = new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + pl.data.color + ", 100%, 50%)")});
+	var wheel = new THREE.Mesh(
+		new THREE.CylinderBufferGeometry(0.5, 0.5, 0.2, 10),
+		new THREE.MeshLambertMaterial({color: new THREE.Color("#222")})
+	);
+	var wheelSpots = [[0.6, 0.7], [-0.6, 0.7], [0.6, -0.7], [-0.6, -0.7]];
+	for(var i = 0; i < wheelSpots.length; i++){
+		var w = wheel.clone();
+		w.position.set(wheelSpots[i][0], -0.1, wheelSpots[i][1]);
+		w.rotation.set(Math.PI / 2, 0, Math.PI / 2);
+		pl.model.add(w);
+	}
+	var label = document.createElement("DIV");
+	label.className = "label";
+	label.innerHTML = String(pl.data.name).replaceAll("<", "&lt;").substring(0, 50) + "<br/>|";
+	pl.label = label;
+	label.position = pl.model.position;
+	f.appendChild(label);
+	labels.push(label);
+	pl.model.receiveShadow = true;
+	scene.add(pl.model);
+	if(mine){
+		me.label = pl.label;
+		me.model = pl.model;
+		me.label.innerHTML = "";
+	}
+}
+
+function startRace(){
+	if(gameStarted)
+		return;
+	var info = document.getElementsByClassName("info")[0];
+	if(info)
+		info.outerHTML = "";
+	var sg = document.getElementById("startgame");
+	if(sg)
+		sg.outerHTML = "";
+
+	gameStarted = true;
+	gameSortaStarted = true;
+
+	var countDown = document.createElement("DIV");
+	countDown.innerHTML = "3";
+	countDown.className = "title";
+	countDown.id = "countdown";
+	f.appendChild(countDown);
+
+	lap = document.createElement("DIV");
+	lap.innerHTML = "1/" + LAPS;
+	lap.className = "title";
+	lap.id = "lap";
+	f.appendChild(lap);
+
+	setTimeout(function(){
+		countDown.innerHTML = "2";
+	}, 1000);
+
+	setTimeout(function(){
+		countDown.innerHTML = "1";
+	}, 2000);
+
+	setTimeout(function(){
+		countDown.innerHTML = "GO!";
+		gameSortaStarted = false;
+	}, 3000);
+
+	setTimeout(function(){
+		countDown.innerHTML = "";
+	}, 4000);
+}
+
+function hostMessage(conn, m){
+	var id = conn.peer;
+	if(!m || typeof m != "object")
+		return;
+	if(m.t == "j"){
+		if(net.status !== 0 || players[id])
+			return;
+		var count = Object.keys(players).length;
+		if(count >= carPos.length){
+			conn.close();
+			return;
+		}
+		var d = newPlayerData();
+		d.color = Number(m.d && m.d.color) || 0;
+		d.name = String(m.d && m.d.name || "Nerd with No Name").substring(0, 50);
+		d.x = carPos[count].x;
+		d.y = carPos[count].y;
+		net.conns[id] = conn;
+		addPlayer(id, d, false);
+		conn.send({t: "y", id: id, p: snapshot()});
+		broadcast({t: "a", id: id, d: d}, id);
+	}else if(m.t == "u"){
+		if(!players[id] || !m.d || typeof m.d != "object")
+			return;
+		players[id].data = m.d;
+		broadcast({t: "u", id: id, d: m.d}, id);
+	}
+}
+
+function startHosting(onCode){
+	var attempt = "";
+	for(var i = 0; i < 4; i++)
+		attempt += CODE_LETTERS[Math.floor(Math.random() * CODE_LETTERS.length)];
+	var opened = false;
+	var peer = new Peer(PEER_PREFIX + attempt);
+	peer.on("error", function(e){
+		if(opened)
+			return;
+		peer.destroy();
+		if(e.type == "unavailable-id")
+			startHosting(onCode);
+		else
+			document.getElementById("code").innerHTML = "Can't connect";
+	});
+	peer.on("open", function(){
+		opened = true;
+		net.peer = peer;
+		net.isHost = true;
+		net.status = 0;
+		code = attempt;
+		onCode();
+	});
+	peer.on("connection", function(conn){
+		conn.on("open", function(){
+			conn.send({t: "w", s: net.status, m: document.getElementById("trackcode").innerHTML});
+		});
+		conn.on("data", function(m){
+			hostMessage(conn, m);
+		});
+		conn.on("close", function(){
+			if(net.conns[conn.peer] === conn)
+				delete net.conns[conn.peer];
+		});
+	});
+}
+
+function joinLobby(c, fail){
+	var done = false;
+	var peer = new Peer();
+	var timer = setTimeout(bail, 10000);
+	function bail(){
+		if(done)
+			return;
+		done = true;
+		clearTimeout(timer);
+		peer.destroy();
+		fail();
+	}
+	peer.on("error", bail);
+	peer.on("open", function(){
+		var conn = peer.connect(PEER_PREFIX + c, {serialization: "json"});
+		conn.on("error", bail);
+		conn.on("close", bail);
+		conn.on("data", function(m){
+			if(!m || typeof m != "object")
+				return;
+			if(m.t == "w"){
+				if(m.s !== 0){
+					bail();
+					return;
+				}
+				document.getElementsByClassName("info")[0].innerHTML = "<div class='info title'>Waiting for the game to start...<div id='code'>" + c + "</div></div>";
+				document.getElementById("trackcode").innerHTML = m.m;
+				deleteMap();
+				eval(loadMap());
+				conn.send({t: "j", d: {color: color, name: name}});
+			}else if(m.t == "y"){
+				done = true;
+				clearTimeout(timer);
+				net.peer = peer;
+				net.hostConn = conn;
+				net.isHost = false;
+				me.id = m.id;
+				for(var p in m.p){
+					if(p != m.id)
+						addPlayer(p, m.p[p], false);
+				}
+				me.data = m.p[m.id];
+				addPlayer(m.id, me.data, true);
+			}else if(m.t == "a"){
+				addPlayer(m.id, m.d, false);
+			}else if(m.t == "u"){
+				if(m.id != me.id && players[m.id])
+					players[m.id].data = m.d;
+			}else if(m.t == "s"){
+				startRace();
+			}
+		});
+	});
+}
+
 host = function(){
 	document.getElementById("host").onclick = null;
 	f.style.transform = "translate3d(0, -100vh, 0)";
 	setTimeout(function(){
 		f.innerHTML = "<div class='info title'>Use this code to join the game!<div id='code'>Loading...</div></div><div id='startgame' class='title' onclick='startGame()' ontouchstart='this.click()'>Start!</div>";
-		if(VR)
-			f.innerHTML += "<div id='divider'></div>";
 		f.appendChild(element);
 		f.style.transform = "none";
-		getCode();
-	}, 1000);
-
-	function getCode(){
-		code = "";
-		var letters = "ABCDEFGHIJKLMMNOPQRSTUVWXYZ";
-		for(var i = 0; i < 4; i++)
-			code += letters[Math.floor(Math.random() * letters.length)];
-		database.ref(code).once("value", function(codeCheck){
-			console.log(codeCheck.val());
-			if(codeCheck.val() == null || codeCheck.val().status == -1 || !codeCheck.val().timestamp || Date.now() - codeCheck.val().timestamp > 1000 * 60 * 60 * 24){ // Allow overwriting a game if it was created more than 24 hours ago - seems safe.
-				console.log(code);
-				document.getElementById("code").innerHTML = code;
-
-				database.ref(code).set({
-					status: 0,
-					players: {},
-					map: document.getElementById("trackcode").innerHTML,
-					timestamp: Date.now()
-				});
-
-				database.ref(code + "/players").on("child_added", function(p){
-					console.log(p);
-					players[p.ref_.path.pieces_[2]] = {
-						data: p.val(),
-						model: new THREE.Mesh(new THREE.BoxBufferGeometry(1, 1, 2))
-					};
-					var pl = players[p.ref_.path.pieces_[2]];
-					pl.model.position.set(pl.data.x, 0.6, pl.data.y);
-					pl.model.material = new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + pl.data.color + ", 100%, 50%)")});
-					var wheel = new THREE.Mesh(
-						new THREE.CylinderBufferGeometry(0.5, 0.5, 0.2, 10),
-						new THREE.MeshLambertMaterial({color: new THREE.Color("#222")})
-					);
-					var w1 = wheel.clone();
-					w1.position.set(0.6, -0.1, 0.7);
-					w1.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-					pl.model.add(w1);
-					var w2 = wheel.clone();
-					w2.position.set(-0.6, -0.1, 0.7);
-					w2.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-					pl.model.add(w2);
-					var w3 = wheel.clone();
-					w3.position.set(0.6, -0.1, -0.7);
-					w3.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-					pl.model.add(w3);
-					var w4 = wheel.clone();
-					w4.position.set(-0.6, -0.1, -0.7);
-					w4.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-					pl.model.add(w4);
-					var label = document.createElement("DIV");
-					label.className = "label";
-					label.innerHTML = pl.data.name.replaceAll("<", "&lt;") + "<br/>|";
-					pl.label = label;
-					label.position = pl.model.position;
-					console.log(label);
-					f.appendChild(label);
-					labels.push(label);
-					pl.model.receiveShadow = true;
-					scene.add(pl.model);
-
-					if(p.ref_.path.pieces_[2] == me.ref.path.pieces_[2]){
-						me.label = pl.label;
-						me.model = pl.model;
-						me.label.innerHTML = "";
-					}
-				});
-
-				database.ref(code + "/players").on("child_changed", function(p){
-					// console.log(p);
-					players[p.ref_.path.pieces_[2]].data = p.val();
-				});
-
-				me.ref = database.ref(code + "/players").push();
-				me.data = {
-					x: 0,
-					y: 0,
-					xv: 0,
-					yv: 0,
-					dir: 0,
-					steer: 0,
-					color: color,
-					name: name,
-					checkpoint: 1,
-					lap: 0,
-					collision: {}
-				}
-				me.ref.set(me.data);
-
-				database.ref(code + "/status").on("value", function(v){
-					v = v.val();
-					if(v == 1){
-						document.getElementsByClassName("info")[0].outerHTML = "";
-						document.getElementById("startgame").outerHTML = "";
-
-						gameStarted = true;
-						gameSortaStarted = true;
-
-						var countDown = document.createElement("DIV");
-						countDown.innerHTML = "3";
-						countDown.className = "title";
-						countDown.id = "countdown";
-						f.appendChild(countDown);
-
-						lap = document.createElement("DIV");
-						lap.innerHTML = "1/" + LAPS;
-						lap.className = "title";
-						lap.id = "lap";
-						f.appendChild(lap);
-
-						setTimeout(function(){
-							countDown.innerHTML = "2";
-						}, 1000);
-
-						setTimeout(function(){
-							countDown.innerHTML = "1";
-						}, 2000);
-
-						setTimeout(function(){
-							countDown.innerHTML = "GO!";
-							gameSortaStarted = false;
-						}, 3000);
-
-						setTimeout(function(){
-							countDown.innerHTML = "";
-						}, 4000);
-					}
-				});
-			}else
-				getCode();
+		startHosting(function(){
+			document.getElementById("code").innerHTML = code;
+			me.id = net.peer.id;
+			me.data = newPlayerData();
+			addPlayer(me.id, me.data, true);
 		});
-	}
+	}, 1000);
 
 	join();
 }
@@ -510,8 +389,6 @@ joinGame = function(){
 	f.style.transform = "translate3d(0, -100vh, 0)";
 	setTimeout(function(){
 		f.innerHTML = "<div class='info title'>Enter a code to join a game!<input id='incode' class='title' onkeyup='codeCheck(event)' ontouchstart='this.focus()'></input></div>";
-		if(VR)
-			f.innerHTML += "<div id='divider'></div>";
 		f.appendChild(element);
 		f.style.transform = "none";
 	}, 1000);
@@ -541,7 +418,6 @@ function deleteMap(){
 function loadMap(){
 	var racedata = document.getElementById("trackcode").innerHTML.trim().split("|")[0].trim().split(" ");
 	var material = new THREE.MeshLambertMaterial({color: new THREE.Color(0xf48342)});
-	//var mapscale = 7;
 	map = new THREE.Object3D();
 	for(var i = 0; i < racedata.length; i++){
 		if(racedata[i] == "")
@@ -695,8 +571,6 @@ function join(){
 	scene.add(light);
 	scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-	//scene.add(new THREE.AmbientLight(0x404040));
-
 	var x = 0;
 	var ray = new THREE.Raycaster();
 	function toXYCoords(pos){
@@ -714,14 +588,6 @@ function join(){
 	ray.far = 1;
 
 	var ren = renderer;
-	var controls;
-	if(VR){
-		var effect = new THREE.StereoEffect(renderer);
-		effect.setSize(window.innerWidth, window.innerHeight);
-		effect.setEyeSeparation(0.7);
-		ren = effect;
-		controls = new THREE.DeviceOrientationControls(camera);
-	}
 
 	var lastTime = performance.now();
 	function render(timestamp) {
@@ -739,11 +605,9 @@ function join(){
 				if(!(left ^ right))
 					me.data.steer = 0;
 			}
-			if(VR)
-				me.data.steer = camera.rotation.z;
 			me.data.steer = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, me.data.steer));
 
-			players[me.ref.path.pieces_[2]].data = me.data;
+			players[me.id].data = me.data;
 
 			if(!gameSortaStarted){
 				for(var p in players){
@@ -767,24 +631,6 @@ function join(){
 					play.model.children[0].rotation.z = Math.PI / 2 - play.data.steer;
 					play.model.children[1].rotation.z = Math.PI / 2 - play.data.steer;
 
-					// function checkCubes(angle){
-					// 	ray.set(play.model.position, angle);
-					// 	var inter = ray.intersectObjects(blocks);
-					// 	if(inter.length > 0 && inter[0].distance < 0.5){
-					// 		// console.log(inter[0]);
-					// 		var vel = new THREE.Vector3(play.data.xv, 0, play.data.yv);
-					// 		vel.reflect(inter[0].face.normal);
-					// 		play.data.xv = vel.x * 0.3;
-					// 		play.data.yv = vel.z * 0.3;
-					// 		play.data.x += play.data.xv;
-					// 		play.data.y += play.data.yv;
-					// 	}
-					// }
-					// checkCubes(new THREE.Vector3(0, 0, 1));
-					// checkCubes(new THREE.Vector3(0, 0, -1));
-					// checkCubes(new THREE.Vector3(1, 0, 0));
-					// checkCubes(new THREE.Vector3(-1, 0, 0));
-
 					for(var w in map.children){
 						var wall = map.children[w];
 						var posi = new THREE.Vector2(play.data.x, play.data.y);
@@ -794,7 +640,6 @@ function join(){
 								vel.reflect(wall.plane.normal);
 								play.data.xv = vel.x + BOUNCE_CORRECT * wall.plane.normal.x * Math.sign(wall.plane.normal.dot(play.model.position.clone().sub(wall.position)));
 								play.data.yv = vel.z + BOUNCE_CORRECT * wall.plane.normal.z * Math.sign(wall.plane.normal.dot(play.model.position.clone().sub(wall.position)));
-								//var dir = Math.normalize();
 								while(Math.abs(wall.plane.distanceToPoint(new THREE.Vector3(play.data.x, 0, play.data.y).sub(wall.position))) < WALL_SIZE){
 									play.data.x += play.data.xv;
 									play.data.y += play.data.yv;
@@ -804,7 +649,6 @@ function join(){
 							}
 						}
 						if(posi.distanceTo(wall.p1) < WALL_SIZE + 0.1){
-							// console.log("o1");
 							var norm = posi.clone().sub(wall.p1);
 							norm = new THREE.Vector3(norm.x, 0, norm.y);
 							norm.normalize();
@@ -820,7 +664,6 @@ function join(){
 							play.data.yv *= BOUNCE;
 						}
 						if(posi.distanceTo(wall.p2) < WALL_SIZE + 0.1){
-							// console.log("o2");
 							var norm = posi.clone().sub(wall.p2);
 							norm = new THREE.Vector3(norm.x, 0, norm.y);
 							norm.normalize();
@@ -841,7 +684,6 @@ function join(){
 						var cp = startc.children[i];
 						if(Math.abs(cp.plane.distanceToPoint(play.model.position.clone().sub(cp.position))) < 1){
 							if(cp.position.clone().distanceTo(play.model.position) < cp.width / 2 + 1){
-								// console.log(i);
 								if(i == 0){
 									if(play.data.checkpoint == 1){
 										play.data.checkpoint = 0;
@@ -908,7 +750,7 @@ function join(){
 			);
 			camera.lookAt(me.model.position);
 
-			me.ref.set(me.data);
+			sendMe();
 
 			lap.innerHTML = me.data.lap <= LAPS ? me.data.lap + "/" + LAPS : "";
 		}else{
@@ -925,7 +767,7 @@ function join(){
 		frustum.setFromMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
 		for(var i = 0; i < labels.length; i++){
 			var label = labels[i];
-			if(frustum.containsPoint(label.position) && !VR){
+			if(frustum.containsPoint(label.position)){
 				var vec = toXYCoords(label.position);
 				label.style.left = vec.x + "px";
 				label.style.top = vec.y + "px";
@@ -940,11 +782,6 @@ function join(){
 			onWindowResize();
 		}
 
-		if(VR){
-			var a = camera.rotation.y;
-			controls.update();
-			camera.rotation.y += a - Math.PI / 2;
-		}
 		ren.render(scene, camera);
 		MODS();
 	}
@@ -968,166 +805,8 @@ codeCheck = function(){
 	if(incode.value.length == 4){
 		incode.onkeyup = null;
 		code = incode.value.toUpperCase();
-		database.ref(code).once("value", function(cc){
-			if(typeof cc.val() != "undefined" && cc.val() != null && cc.val().status === 0){
-				document.getElementsByClassName("info")[0].innerHTML = "<div class='info title'>Waiting for the game to start...<div id='code'>" + code + "</div></div>";
-				var playerCount = 0;
-				for(var p in cc.val().players){
-					playerCount++;
-					console.log(p);
-					players[p] = {
-						data: cc.val().players[p],
-						model: new THREE.Mesh(new THREE.BoxBufferGeometry(1, 1, 2))
-					};
-					var pl = players[p];
-					pl.model.position.set(pl.data.x, 0.6, pl.data.y);
-					pl.model.material = new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + pl.data.color + ", 100%, 50%)")});
-					var wheel = new THREE.Mesh(
-						new THREE.CylinderBufferGeometry(0.5, 0.5, 0.2, 10),
-						new THREE.MeshLambertMaterial({color: new THREE.Color("#222")})
-					);
-					var w1 = wheel.clone();
-					w1.position.set(0.6, -0.1, 0.7);
-					w1.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-					pl.model.add(w1);
-					var w2 = wheel.clone();
-					w2.position.set(-0.6, -0.1, 0.7);
-					w2.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-					pl.model.add(w2);
-					var w3 = wheel.clone();
-					w3.position.set(0.6, -0.1, -0.7);
-					w3.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-					pl.model.add(w3);
-					var w4 = wheel.clone();
-					w4.position.set(-0.6, -0.1, -0.7);
-					w4.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-					pl.model.add(w4);
-					var label = document.createElement("DIV");
-					label.className = "label";
-					label.innerHTML = pl.data.name.replaceAll("<", "&lt;").substring(0, 50) + "<br/>|";
-					pl.label = label;
-					label.position = pl.model.position;
-					console.log(label);
-					f.appendChild(label);
-					labels.push(label);
-					pl.model.receiveShadow = true;
-					scene.add(pl.model);
-				}
-				database.ref(code + "/players").on("child_added", function(p){
-					if(typeof players[p.ref_.path.pieces_[2]] == "undefined"){
-						console.log(p);
-						players[p.ref_.path.pieces_[2]] = {
-							data: p.val(),
-							model: new THREE.Mesh(new THREE.BoxBufferGeometry(1, 1, 2))
-						};
-						var pl = players[p.ref_.path.pieces_[2]];
-						pl.model.position.set(pl.data.x, 0.6, pl.data.y);
-						pl.model.material = new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + pl.data.color + ", 100%, 50%)")});
-						var wheel = new THREE.Mesh(
-							new THREE.CylinderBufferGeometry(0.5, 0.5, 0.2, 10),
-							new THREE.MeshLambertMaterial({color: new THREE.Color("#222")})
-						);
-						var w1 = wheel.clone();
-						w1.position.set(0.6, -0.1, 0.7);
-						w1.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-						pl.model.add(w1);
-						var w2 = wheel.clone();
-						w2.position.set(-0.6, -0.1, 0.7);
-						w2.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-						pl.model.add(w2);
-						var w3 = wheel.clone();
-						w3.position.set(0.6, -0.1, -0.7);
-						w3.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-						pl.model.add(w3);
-						var w4 = wheel.clone();
-						w4.position.set(-0.6, -0.1, -0.7);
-						w4.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-						pl.model.add(w4);
-						var label = document.createElement("DIV");
-						label.className = "label";
-						label.innerHTML = pl.data.name.replaceAll("<", "&lt;").substring(0, 50) + "<br/>|";
-						pl.label = label;
-						label.position = pl.model.position;
-						console.log(label);
-						f.appendChild(label);
-						labels.push(label);
-						pl.model.receiveShadow = true;
-						scene.add(pl.model);
-
-						if(p.ref_.path.pieces_[2] == me.ref.path.pieces_[2]){
-							me.label = pl.label;
-							me.model = pl.model;
-							me.label.innerHTML = "";
-						}
-					}
-				});
-
-				database.ref(code + "/players").on("child_changed", function(p){
-					// console.log(p);
-					players[p.ref_.path.pieces_[2]].data = p.val();
-				});
-				console.log("playerCount: " + playerCount);
-				me.ref = database.ref(code + "/players").push();
-				me.data = {
-					x: carPos[playerCount].x,
-					y: carPos[playerCount].y,
-					xv: 0,
-					yv: 0,
-					dir: 0,
-					steer: 0,
-					color: color,
-					name: name,
-					checkpoint: 1,
-					lap: 0,
-					collision: {}
-				}
-				me.ref.set(me.data);
-
-				database.ref(code + "/status").on("value", function(v){
-					v = v.val();
-					if(v == 1){
-						document.getElementsByClassName("info")[0].outerHTML = "";
-
-						gameStarted = true;
-						gameSortaStarted = true;
-
-						var countDown = document.createElement("DIV");
-						countDown.innerHTML = "3";
-						countDown.className = "title";
-						countDown.id = "countdown";
-						f.appendChild(countDown);
-
-						lap = document.createElement("DIV");
-						lap.innerHTML = "1/3";
-						lap.className = "title";
-						lap.id = "lap";
-						f.appendChild(lap);
-
-						setTimeout(function(){
-							countDown.innerHTML = "2";
-						}, 1000);
-
-						setTimeout(function(){
-							countDown.innerHTML = "1";
-						}, 2000);
-
-						setTimeout(function(){
-							countDown.innerHTML = "GO!";
-							gameSortaStarted = false;
-						}, 3000);
-
-						setTimeout(function(){
-							countDown.innerHTML = "";
-						}, 4000);
-					}
-				});
-				database.ref(code + "/map").once("value", function(e){
-					document.getElementById("trackcode").innerHTML = e.val();
-					deleteMap();
-					eval(loadMap());
-				});
-			}else
-				incode.onkeyup = codeCheck;
+		joinLobby(code, function(){
+			incode.onkeyup = codeCheck;
 		});
 	}else{
 		incode.onkeyup = codeCheck;
@@ -1137,7 +816,11 @@ codeCheck = function(){
 }
 
 function startGame(){
-	database.ref(code + "/status").set(1);
+	if(!net.isHost || net.status !== 0)
+		return;
+	net.status = 1;
+	broadcast({t: "s"});
+	startRace();
 }
 
 window.onkeydown = function(e){

@@ -17,12 +17,7 @@
 		<link href="https://fonts.googleapis.com/css?family=Monoton|Press+Start+2P" rel="stylesheet">
 		<link href="style.css" rel="stylesheet">
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/86/three.min.js"></script>
-		<script src="https://www.gstatic.com/firebasejs/7.22.1/firebase-app.js"></script>
-		<script src="https://www.gstatic.com/firebasejs/7.22.1/firebase-database.js"></script>
-		<script src="https://www.gstatic.com/firebasejs/7.22.1/firebase-auth.js"></script>
-		<script src="https://www.gstatic.com/firebasejs/7.22.1/firebase-analytics.js"></script>
-		<script src="https://jchabin.github.io/VR-ThreeJS-Test/ThreeJS/DeviceOrientationControls.js"></script>
-		<script src="https://jchabin.github.io/VR-ThreeJS-Test/ThreeJS/StereoEffect.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
 		<script data-ad-client="ca-pub-8222390470642566" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
 		<title>Online Racing Game!</title>
 	</head>
@@ -42,7 +37,6 @@
 		<div id="settings" onclick="this.parentNode.children[7].className = this.parentNode.children[7].className == 'sel' ? '' : 'sel';"></div>
 		<div id="toolbar">
 			<div class="tools" id="edit" onclick="location.href.includes('index.html') ? window.open('editor/index.html') : window.open('editor')"></div>
-			<div class="tools" id="cardboard" onclick="this.className = this.className == 'tools disabled' ? this.className : this.className == 'tools sel' ? 'tools' : 'tools sel';"></div>
 			<div class="tools" id="help" onclick="location.href.includes('index.html') ? window.open('help/index.html') : window.open('help')">?</div>
 		</div>
 		<a id="mywebsitelink" href="https://johnnychabin.com/?projects" target="_blank"><img src="https://johnnychabin.com/images/carsprev.webp" style="max-height: 30vmin;"></a>
