@@ -324,10 +324,15 @@ input{
 	background-color: rgba(0, 0, 0, 0.5);
 	text-transform: uppercase;
 }
-#startgame{
+#host-actions{
 	position: absolute;
 	bottom: 5vmin;
 	right: 5vmin;
+	display: flex;
+	gap: 2vmin;
+	z-index: 100000;
+}
+#startgame, #settingsbtn{
 	color: white;
 	border: 1vmin solid white;
 	background-color: rgba(0, 0, 0, 0.5);
@@ -336,27 +341,8 @@ input{
 	padding: 2vmin;
 	transition: box-shadow .2s, transform .2s;
 	box-shadow: 0 2vmin 3vmin rgba(0, 0, 0, 0.5);
-	z-index: 100000;
 }
-#startgame:hover{
-	box-shadow: 0 0.5vmin 1vmin rgba(0, 0, 0, 0.5);
-	transform: scale(0.9);
-}
-#settingsbtn{
-	position: absolute;
-	bottom: 5vmin;
-	right: 35vmin;
-	color: white;
-	border: 1vmin solid white;
-	background-color: rgba(0, 0, 0, 0.5);
-	cursor: pointer;
-	font-size: 10vmin;
-	padding: 2vmin;
-	transition: box-shadow .2s, transform .2s;
-	box-shadow: 0 2vmin 3vmin rgba(0, 0, 0, 0.5);
-	z-index: 100000;
-}
-#settingsbtn:hover{
+#startgame:hover, #settingsbtn:hover{
 	box-shadow: 0 0.5vmin 1vmin rgba(0, 0, 0, 0.5);
 	transform: scale(0.9);
 }
@@ -370,7 +356,7 @@ input{
 	z-index: 1000000;
 }
 .modal-content{
-	background: #222;
+	background: rgba(0, 0, 0, 0.85);
 	padding: 4vmin;
 	border: 1vmin solid white;
 	display: flex;
@@ -378,20 +364,22 @@ input{
 	gap: 2vmin;
 	color: white;
 	font-size: 3vmin;
+	font-family: Monoton;
 }
 .modal-content input, .modal-content select{
 	font-size: 3vmin;
 	margin-left: 2vmin;
-	background: #111;
+	background: rgba(0, 0, 0, 0.5);
 	color: white;
 	border: 0.5vmin solid white;
 	padding: 1vmin;
+	outline: none;
 }
 #role-banner{
 	position: absolute;
-	top: 20%;
+	top: 50%;
 	left: 50%;
-	transform: translateX(-50%);
+	transform: translate(-50%, -50%);
 	font-size: 8vmin;
 	font-weight: bold;
 	text-shadow: 0 0 3vmin black;
