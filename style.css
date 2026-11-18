@@ -97,6 +97,34 @@ input{
 	text-align: center;
 	color: white;
 }
+#facebtn{
+	box-sizing: border-box;
+	width: 12vmin;
+	height: 12vmin;
+	margin-right: 2vmin;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: white;
+	background-color: rgba(0, 0, 0, 0.5);
+	background-size: cover;
+	image-rendering: pixelated;
+	border: 1vmin solid white;
+	cursor: pointer;
+	box-shadow: 0 1vmin 1.5vmin rgba(0, 0, 0, 0.5);
+	transition: transform .2s, box-shadow .2s;
+}
+#facebtn svg{
+	width: 7vmin;
+	height: 7vmin;
+}
+#facebtn.has svg{
+	display: none;
+}
+#facebtn:hover{
+	transform: scale(0.9);
+	box-shadow: 0 0.25vmin 0.5vmin rgba(0, 0, 0, 0.5);
+}
 #randname{
 	box-sizing: border-box;
 	width: 12vmin;
@@ -591,4 +619,109 @@ input{
 #cfgdone{
 	margin: 3vmin auto 0;
 	width: 30vmin;
+}
+#facepad{
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: rgba(0, 0, 0, 0.75);
+	z-index: 100002;
+}
+#facebox{
+	box-sizing: border-box;
+	width: 94vmin;
+	padding: 3vmin;
+	color: white;
+	background-color: rgba(0, 0, 0, 0.5);
+	border: 1vmin solid white;
+	box-shadow: 0 2vmin 3vmin rgba(0, 0, 0, 0.5);
+}
+#facetitle{
+	font-size: 7vmin;
+	line-height: 1.1;
+	text-shadow: 0 0 2vmin white;
+}
+#faceedit{
+	display: flex;
+	justify-content: space-between;
+	margin-top: 2.5vmin;
+}
+#facecanvas{
+	display: block;
+	box-sizing: border-box;
+	width: 44vmin;
+	height: 44vmin;
+	border: 1vmin solid white;
+	image-rendering: pixelated;
+	cursor: crosshair;
+	touch-action: none;
+}
+#facetools{
+	width: 36vmin;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+#swatches{
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+}
+.swatch{
+	box-sizing: border-box;
+	width: 8vmin;
+	height: 8vmin;
+	margin-bottom: 1vmin;
+	border: 1vmin solid rgba(255, 255, 255, 0.4);
+	cursor: pointer;
+}
+.swatch.sel{
+	border-color: white;
+	box-shadow: 0 0 1.5vmin white;
+}
+.facerow{
+	display: flex;
+	justify-content: space-between;
+}
+.facerow .cfgbtn{
+	flex: 1;
+	margin: 0 0.5vmin;
+	padding: 0;
+	font-size: 4vmin;
+}
+#facedone{
+	margin: 0;
+	width: 100%;
+}
+#viewbtn{
+	box-sizing: border-box;
+	width: 10vmin;
+	height: 8vmin;
+	margin-left: 3vmin;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: white;
+	border: 1vmin solid white;
+	background-color: rgba(0, 0, 0, 0.5);
+	cursor: pointer;
+	transition: transform .2s, box-shadow .2s;
+	box-shadow: 0 1vmin 1.5vmin rgba(0, 0, 0, 0.5);
+}
+#viewbtn svg{
+	width: 5vmin;
+	height: 5vmin;
+}
+#viewbtn.on{
+	color: black;
+	background-color: white;
+}
+#viewbtn:hover{
+	box-shadow: 0 0.25vmin 0.5vmin rgba(0, 0, 0, 0.5);
+	transform: scale(0.9);
 }
