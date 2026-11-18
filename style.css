@@ -324,15 +324,42 @@ input{
 	background-color: rgba(0, 0, 0, 0.5);
 	text-transform: uppercase;
 }
-#host-actions{
+#hostbar{
 	position: absolute;
 	bottom: 5vmin;
 	right: 5vmin;
 	display: flex;
-	gap: 2vmin;
+	align-items: stretch;
 	z-index: 100000;
 }
-#startgame, #settingsbtn{
+#lobbysettings{
+	position: relative;
+	box-sizing: border-box;
+	width: 18vmin;
+	margin-right: 2vmin;
+	border: 1vmin solid white;
+	background-color: rgba(0, 0, 0, 0.5);
+	cursor: pointer;
+	box-shadow: 0 2vmin 3vmin rgba(0, 0, 0, 0.5);
+	transition: box-shadow .2s, transform .2s;
+}
+#lobbysettings::after{
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	height: 10vmin;
+	width: 10vmin;
+	margin: -5vmin 0 0 -5vmin;
+	background-image: url("https://jchabin.github.io/cars/gear.png");
+	background-size: cover;
+	filter: invert(1);
+}
+#lobbysettings:hover{
+	box-shadow: 0 0.5vmin 1vmin rgba(0, 0, 0, 0.5);
+	transform: scale(0.9);
+}
+#startgame{
 	color: white;
 	border: 1vmin solid white;
 	background-color: rgba(0, 0, 0, 0.5);
@@ -342,50 +369,9 @@ input{
 	transition: box-shadow .2s, transform .2s;
 	box-shadow: 0 2vmin 3vmin rgba(0, 0, 0, 0.5);
 }
-#startgame:hover, #settingsbtn:hover{
+#startgame:hover{
 	box-shadow: 0 0.5vmin 1vmin rgba(0, 0, 0, 0.5);
 	transform: scale(0.9);
-}
-#settings-modal{
-	position: fixed;
-	top: 0; left: 0; width: 100%; height: 100%;
-	background: rgba(0,0,0,0.7);
-	display: none;
-	align-items: center;
-	justify-content: center;
-	z-index: 1000000;
-}
-.modal-content{
-	background: rgba(0, 0, 0, 0.85);
-	padding: 4vmin;
-	border: 1vmin solid white;
-	display: flex;
-	flex-direction: column;
-	gap: 2vmin;
-	color: white;
-	font-size: 3vmin;
-	font-family: Monoton;
-}
-.modal-content input, .modal-content select{
-	font-size: 3vmin;
-	margin-left: 2vmin;
-	background: rgba(0, 0, 0, 0.5);
-	color: white;
-	border: 0.5vmin solid white;
-	padding: 1vmin;
-	outline: none;
-}
-#role-banner{
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	transform: translate(-50%, -50%);
-	font-size: 8vmin;
-	font-weight: bold;
-	text-shadow: 0 0 3vmin black;
-	z-index: 99998;
-	pointer-events: none;
-	font-family: Monoton;
 }
 .label{
 	font-family: "Press Start 2P";
@@ -499,4 +485,110 @@ input{
 #leave:hover{
 	box-shadow: 0 0.25vmin 0.5vmin rgba(0, 0, 0, 0.5);
 	transform: scale(0.9);
+}
+#lap.timer{
+	font-size: 6vmin;
+	top: 3vmin;
+}
+#role{
+	position: absolute;
+	left: 0;
+	top: 14vmin;
+	width: 100vw;
+	text-align: center;
+	color: white;
+	font-size: 5vmin;
+	line-height: 1.1;
+	text-shadow: 0 0 2vmin white;
+	pointer-events: none;
+	z-index: 100000;
+	transition: top .5s, font-size .5s;
+}
+#role.it{
+	color: #ff6b6b;
+	text-shadow: 0 0 2vmin #ff2020;
+}
+#role.big{
+	top: calc(50vh + 18vmin);
+	font-size: 10vmin;
+}
+#cfg{
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: rgba(0, 0, 0, 0.75);
+	z-index: 100002;
+}
+#cfgbox{
+	box-sizing: border-box;
+	width: min(94vw, 120vmin);
+	padding: 3vmin;
+	color: white;
+	background-color: rgba(0, 0, 0, 0.5);
+	border: 1vmin solid white;
+	box-shadow: 0 2vmin 3vmin rgba(0, 0, 0, 0.5);
+}
+#cfgtitle{
+	font-size: 8vmin;
+	line-height: 1.1;
+	text-shadow: 0 0 2vmin white;
+}
+.cfgrow{
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-top: 2.5vmin;
+}
+.cfglabel{
+	font-size: 5vmin;
+}
+.cfgctl{
+	display: flex;
+	align-items: center;
+}
+.cfgval{
+	min-width: 22vmin;
+	font-size: 6vmin;
+	text-align: center;
+}
+.cfgbtn{
+	box-sizing: border-box;
+	min-width: 9vmin;
+	height: 9vmin;
+	padding: 0 2.5vmin;
+	margin-left: 1.5vmin;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 5vmin;
+	border: 1vmin solid white;
+	background-color: rgba(0, 0, 0, 0.5);
+	cursor: pointer;
+	user-select: none;
+	-webkit-user-select: none;
+	transition: transform .2s, box-shadow .2s;
+	box-shadow: 0 1vmin 1.5vmin rgba(0, 0, 0, 0.5);
+}
+.cfgbtn:hover{
+	transform: scale(0.9);
+	box-shadow: 0 0.25vmin 0.5vmin rgba(0, 0, 0, 0.5);
+}
+.cfgbtn.sq{
+	margin: 0;
+	padding: 0;
+	font-family: Arial, sans-serif;
+	font-size: 7vmin;
+}
+.cfgbtn.sel{
+	color: black;
+	background-color: white;
+}
+#cfgdone{
+	margin: 3vmin auto 0;
+	width: 30vmin;
 }
