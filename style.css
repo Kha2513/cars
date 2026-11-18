@@ -454,3 +454,24 @@ input{
 	-webkit-transform: scale(0.9);
 	        transform: scale(0.9);
 }
+#satpicker, #lightpicker{
+	margin-top: 2vmin;
+}
+#randname{
+	display: inline-block;
+	vertical-align: middle;
+	margin-left: 2vmin;
+	font-size: 5vmin;
+	padding: 2vmin;
+	border: 1vmin solid white;
+	background-color: rgba(0, 0, 0, 0.5);
+	text-shadow: none;
+	cursor: pointer;
+	box-shadow: 0 1vmin 1.5vmin rgba(0, 0, 0, 0.5);
+	transition: box-shadow .2s, transform .2s, -webkit-transform .2s;
+}
+#randname:hover{
+	box-shadow: 0 0.25vmin 0.5vmin rgba(0, 0, 0, 0.5);
+	-webkit-transform: scale(0.9);
+	        transform: scale(0.9);
+}
