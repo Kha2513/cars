@@ -12,6 +12,25 @@ function MODS(){
 
 }
 
+setTimeout(function(){
+	document.getElementById("title").style.transform = "none";
+}, 500);
+setTimeout(function(){
+	document.getElementsByClassName("menuitem")[0].style.transform = "none";
+}, 1000);
+setTimeout(function(){
+	document.getElementsByClassName("menuitem")[1].style.transform = "none";
+}, 1200);
+setTimeout(function(){
+	document.getElementsByClassName("menuitem")[2].style.transform = "none";
+}, 1400);
+setTimeout(function(){
+	document.getElementById("mywebsitelink").style.transform = "none";
+}, 1600);
+setTimeout(function(){
+	document.getElementById("settings").style.transform = "none";
+}, 1800);
+
 if(top != self) {
 	document.getElementById("warning").style.display = "block";
 }
