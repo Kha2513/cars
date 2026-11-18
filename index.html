@@ -27,14 +27,13 @@
 	</div>
 	<div id="fore">
 		<div id="version">v1.1.3.14</div>
-		<div class="title" id="title">kha's racing game!</div>
-		<div class="menuitem title">Pick a name:<br/><input id="name" class="title" ontouchstart="this.focus()" placeholder="Name"></input><div id="randname" onclick="randomName()">choose a random name</div></div>
-		<script>
-			var color, updateColor, menu2, host, joinGame, codeCheck;
-		</script>
-		<div class="menuitem title">Choose a color:<br/><div id="colorpicker" ontouchstart="event.touches[0].buttons = 1; this.onmousemove(event.touches[0])" ontouchmove="event.touches[0].buttons = 1; this.onmousemove(event.touches[0])" onmousedown="this.onmousemove(event)" onmousemove="if(event.buttons == 1){ var x = event.clientX - this.getBoundingClientRect().left; x = Math.min(this.clientWidth, Math.max(0, x)); color = Math.floor(x / this.clientWidth * 360); updateColor(); }"><div id="slider"></div></div><br/><div id="satpicker"><div id="satslider"></div></div><br/><div id="lightpicker"><div id="lightslider"></div></div></div>
-		<div class="menuitem title"><div id="start" onclick="menu2()">Start!</div></div>
-		<div id="settings" onclick="this.parentNode.children[7].className = this.parentNode.children[7].className == 'sel' ? '' : 'sel';"></div>
+		<div id="menu">
+			<div class="title" id="title">kha's racing game!</div>
+			<div class="menuitem title">Pick a name:<div class="row"><input id="name" class="title" ontouchstart="this.focus()" placeholder="Name"><div id="randname" title="Random name" onclick="randomName()"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="8" r="1.7" fill="currentColor"/><circle cx="16" cy="8" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="8" cy="16" r="1.7" fill="currentColor"/><circle cx="16" cy="16" r="1.7" fill="currentColor"/></svg></div></div></div>
+			<div class="menuitem title">Choose a color:<div id="colorpicker" class="picker"><div id="slider" class="thumb"></div></div><div id="satpicker" class="picker"><div id="satslider" class="thumb"></div></div><div id="lightpicker" class="picker"><div id="lightslider" class="thumb"></div></div></div>
+			<div class="menuitem title"><div id="start" onclick="menu2()">Start!</div></div>
+		</div>
+		<div id="settings" onclick="document.getElementById('toolbar').classList.toggle('sel')"></div>
 		<div id="toolbar">
 			<div class="tools" id="edit" onclick="location.href.includes('index.html') ? window.open('editor/index.html') : window.open('editor')"></div>
 			<div class="tools" id="help" onclick="location.href.includes('index.html') ? window.open('help/index.html') : window.open('help')">?</div>
