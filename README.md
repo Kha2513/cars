@@ -1,1 +1,1 @@
-cooler version for me and my frieds
+cooler version for me and my friends
