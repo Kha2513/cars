@@ -99,14 +99,89 @@ var carPos = [
 	{x: 2, y: -15},
 	{x: -2, y: -15}
 ];
+var sat = 100, light = 50;
+var NAME_ADJ = ["Turbo", "Speedy", "Rapid", "Nitro", "Drift", "Blazing", "Flying", "Mighty", "Sneaky", "Lucky", "Cosmic", "Electric", "Frosty", "Golden", "Rocket", "Savage", "Wild", "Zippy"];
+var NAME_NOUN = ["Panda", "Falcon", "Tiger", "Comet", "Racer", "Viper", "Wolf", "Dragon", "Cheetah", "Bandit", "Shark", "Phoenix", "Rhino", "Otter", "Meteor", "Gecko", "Badger", "Hornet"];
+
+function clampNum(v, lo, hi, def){
+	v = Number(v);
+	return isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def;
+}
+
 color = Math.floor(Math.random() * 360);
 var f = document.getElementById("fore");
 var s = document.getElementById("slider");
-updateColor = function(){
-	s.style.marginLeft = color / 360 * 80 + "vw";
-	s.style.backgroundColor = "hsl(" + color + ", 100%, 50%)";
-	document.body.style.backgroundColor = "hsl(" + color + ", 50%, 50%)";
+var satSlider = document.getElementById("satslider");
+var lightSlider = document.getElementById("lightslider");
+var satPicker = document.getElementById("satpicker");
+var lightPicker = document.getElementById("lightpicker");
+var nameBox = document.getElementById("name");
+
+function saveProfile(){
+	try{
+		localStorage.setItem("carsProfile", JSON.stringify({name: nameBox.value, color: color, sat: sat, light: light}));
+	}catch(e){}
 }
+
+function loadProfile(){
+	try{
+		var p = JSON.parse(localStorage.getItem("carsProfile"));
+		if(!p)
+			return;
+		if(typeof p.name == "string")
+			nameBox.value = p.name.substring(0, 50);
+		color = Math.floor(clampNum(p.color, 0, 360, color));
+		sat = Math.round(clampNum(p.sat, 0, 100, 100));
+		light = Math.round(clampNum(p.light, 0, 100, 50));
+	}catch(e){}
+}
+
+function randomName(){
+	nameBox.value = NAME_ADJ[Math.floor(Math.random() * NAME_ADJ.length)] + " " + NAME_NOUN[Math.floor(Math.random() * NAME_NOUN.length)];
+	saveProfile();
+}
+
+function bindPicker(el, set){
+	function move(e){
+		var x = e.clientX - el.getBoundingClientRect().left;
+		x = Math.min(el.clientWidth, Math.max(0, x));
+		set(x / el.clientWidth);
+		updateColor();
+	}
+	el.addEventListener("mousedown", move);
+	el.addEventListener("mousemove", function(e){
+		if(e.buttons == 1)
+			move(e);
+	});
+	el.addEventListener("touchstart", function(e){
+		move(e.touches[0]);
+	});
+	el.addEventListener("touchmove", function(e){
+		move(e.touches[0]);
+	});
+}
+
+updateColor = function(){
+	var car = "hsl(" + color + ", " + sat + "%, " + light + "%)";
+	s.style.marginLeft = color / 360 * 80 + "vw";
+	s.style.backgroundColor = car;
+	satSlider.style.marginLeft = sat / 100 * 80 + "vw";
+	satSlider.style.backgroundColor = car;
+	lightSlider.style.marginLeft = light / 100 * 80 + "vw";
+	lightSlider.style.backgroundColor = car;
+	satPicker.style.background = "linear-gradient(90deg, hsl(" + color + ", 0%, " + light + "%), hsl(" + color + ", 100%, " + light + "%))";
+	lightPicker.style.background = "linear-gradient(90deg, hsl(" + color + ", " + sat + "%, 0%), hsl(" + color + ", " + sat + "%, 50%), hsl(" + color + ", " + sat + "%, 100%))";
+	document.body.style.backgroundColor = "hsl(" + color + ", 50%, 50%)";
+	saveProfile();
+}
+bindPicker(satPicker, function(v){
+	sat = Math.round(v * 100);
+});
+bindPicker(lightPicker, function(v){
+	light = Math.round(v * 100);
+});
+nameBox.addEventListener("input", saveProfile);
+loadProfile();
 updateColor();
 
 menu2 = function(){
