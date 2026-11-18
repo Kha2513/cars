@@ -68,7 +68,7 @@ function toggleFullScreen() {
 	var doc = window.document;
 	var docEl = doc.documentElement;
 
-	var requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullscreen || docEl.msRequestFullscreen;
+	var requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
 	var cancelFullScreen = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
 
 	if(!doc.fullscreenElement && !doc.mozFullScreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement) {
@@ -344,7 +344,7 @@ function openSettings(){
 	if(!modal){
 		modal = document.createElement("DIV");
 		modal.id = "settings-modal";
-		modal.innerHTML = "<div class='modal-content'><h2>Lobby Settings</h2><label>Mode: <select id='set-mode'><option value='racing'>Racing Mode</option><option value='tag'>Tag Mode</option></select></label><label>Goal Laps: <input type='number' id='set-laps' value='" + LAPS + "' min='1'></label><label>Car Speed Multiplier: <input type='number' id='set-speed' value='" + CAR_SPEED_MULT + "' step='0.1' min='0.5' max='3'></label><label>Tag Time (s): <input type='number' id='set-time' value='" + TAG_TIME + "' min='10'></label><button id='set-save' class='title' style='cursor:pointer; padding:2vmin; background:rgba(0,0,0,0.5); color:white; border:1vmin solid white;'>Save & Close</button></div>";
+		modal.innerHTML = "<div class='modal-content title'><h2>Lobby Settings</h2><label>Mode: <select id='set-mode'><option value='racing'>Racing Mode</option><option value='tag'>Tag Mode</option></select></label><label>Goal Laps: <input type='number' id='set-laps' value='" + LAPS + "' min='1'></label><label>Car Speed Multiplier: <input type='number' id='set-speed' value='" + CAR_SPEED_MULT + "' step='0.1' min='0.5' max='3'></label><label>Tag Time (s): <input type='number' id='set-time' value='" + TAG_TIME + "' min='10'></label><div id='set-save' class='title' style='cursor:pointer; text-align:center; padding:1.5vmin 2vmin; border:1vmin solid white; background:rgba(0,0,0,0.5);'>Save & Close</div></div>";
 		document.body.appendChild(modal);
 		document.getElementById("set-save").onclick = function(){
 			GAME_MODE = document.getElementById("set-mode").value;
@@ -389,12 +389,9 @@ function startRace(){
 	var info = document.getElementsByClassName("info")[0];
 	if(info)
 		info.outerHTML = "";
-	var sg = document.getElementById("startgame");
-	if(sg)
-		sg.outerHTML = "";
-	var sbtn = document.getElementById("settingsbtn");
-	if(sbtn)
-		sbtn.outerHTML = "";
+	var hostActions = document.getElementById("host-actions");
+	if(hostActions)
+		hostActions.outerHTML = "";
 
 	gameStarted = true;
 	gameSortaStarted = true;
@@ -624,7 +621,7 @@ function host(){
 	document.getElementById("host").onclick = null;
 	f.style.transform = "translate3d(0, -100vh, 0)";
 	setTimeout(function(){
-		f.innerHTML = "<div class='info title'>Use this code to join the game!<div id='code'>Loading...</div></div><div id='startgame' class='title' onclick='startGame()' ontouchstart='this.click()'>Start!</div><div id='settingsbtn' class='title' onclick='openSettings()' ontouchstart='this.click()'>Settings</div>";
+		f.innerHTML = "<div class='info title'>Use this code to join the game!<div id='code'>Loading...</div></div><div id='host-actions'><div id='settingsbtn' class='title' onclick='openSettings()' ontouchstart='this.click()'>Settings</div><div id='startgame' class='title' onclick='startGame()' ontouchstart='this.click()'>Start!</div></div>";
 		f.appendChild(element);
 		f.style.transform = "none";
 		startHosting(function(){
