@@ -103,6 +103,11 @@ var carPos = [
 	{x: -2, y: -15}
 ];
 var sat = 100, light = 50;
+var faceData = null;
+var FACE_SIZE = 32;
+var FACE_COLORS = ["#000000", "#ffffff", "#ff3b30", "#ff9500", "#ffd60a", "#34c759", "#0a84ff", "#bf5af2"];
+var brush = {color: "#000000", size: 2, erase: false, last: null};
+var frontView = false, snapCamera = false;
 var NAME_ADJ = ["Turbo", "Speedy", "Rapid", "Nitro", "Drift", "Blazing", "Flying", "Mighty", "Sneaky", "Lucky", "Cosmic", "Electric", "Frosty", "Golden", "Rocket", "Savage", "Wild", "Zippy"];
 var NAME_NOUN = ["Panda", "Falcon", "Tiger", "Comet", "Racer", "Viper", "Wolf", "Dragon", "Cheetah", "Bandit", "Shark", "Phoenix", "Rhino", "Otter", "Meteor", "Gecko", "Badger", "Hornet"];
 
@@ -123,7 +128,7 @@ var nameBox = document.getElementById("name");
 
 function saveProfile(){
 	try{
-		localStorage.setItem("carsProfile", JSON.stringify({name: nameBox.value, color: color, sat: sat, light: light}));
+		localStorage.setItem("carsProfile", JSON.stringify({name: nameBox.value, color: color, sat: sat, light: light, face: faceData}));
 	}catch(e){}
 }
 
@@ -137,7 +142,203 @@ function loadProfile(){
 		color = Math.floor(clampNum(p.color, 0, 360, color));
 		sat = Math.round(clampNum(p.sat, 0, 100, 100));
 		light = Math.round(clampNum(p.light, 0, 100, 50));
+		if(cleanFace(p.face))
+			faceData = p.face;
 	}catch(e){}
+}
+
+function cleanFace(v){
+	return typeof v == "string" && v.indexOf("data:image/png;base64,") === 0 && v.length < 12000 ? v : null;
+}
+
+function carColor(d){
+	return "hsl(" + clampNum(d.color, 0, 360, 0) + ", " + clampNum(d.sat, 0, 100, 100) + "%, " + clampNum(d.light, 0, 100, 50) + "%)";
+}
+
+function faceSnapshot(){
+	var out = {};
+	for(var id in players){
+		if(players[id].face)
+			out[id] = players[id].face;
+	}
+	return out;
+}
+
+function setFace(pl, v){
+	v = cleanFace(v);
+	if(!v)
+		return;
+	var c = document.createElement("CANVAS");
+	c.width = FACE_SIZE;
+	c.height = FACE_SIZE;
+	var ctx = c.getContext("2d");
+	ctx.fillStyle = carColor(pl.data);
+	ctx.fillRect(0, 0, FACE_SIZE, FACE_SIZE);
+	var tex = new THREE.Texture(c);
+	tex.magFilter = THREE.NearestFilter;
+	tex.needsUpdate = true;
+	var img = new Image();
+	img.onload = function(){
+		ctx.drawImage(img, 0, 0, FACE_SIZE, FACE_SIZE);
+		tex.needsUpdate = true;
+	};
+	img.src = v;
+	var mesh = new THREE.Mesh(
+		new THREE.PlaneBufferGeometry(1, 1),
+		new THREE.MeshLambertMaterial({map: tex})
+	);
+	mesh.position.set(0, 0, 1.01);
+	pl.model.add(mesh);
+	pl.face = v;
+}
+
+function updateFaceBtn(){
+	var b = document.getElementById("facebtn");
+	if(!b)
+		return;
+	if(faceData){
+		b.classList.add("has");
+		b.style.backgroundImage = "url(" + faceData + ")";
+		b.style.backgroundColor = "hsl(" + color + ", " + sat + "%, " + light + "%)";
+	}else{
+		b.classList.remove("has");
+		b.style.backgroundImage = "";
+		b.style.backgroundColor = "";
+	}
+}
+
+function faceToolsHtml(){
+	var out = "<div id='swatches'>";
+	for(var i = 0; i < FACE_COLORS.length; i++)
+		out += "<div class='swatch" + (!brush.erase && brush.color == FACE_COLORS[i] ? " sel" : "") + "' data-act='color' data-val='" + FACE_COLORS[i] + "' style='background-color:" + FACE_COLORS[i] + "'></div>";
+	out += "</div><div class='facerow'>";
+	var sizes = [["S", 1], ["M", 2], ["L", 4]];
+	for(var j = 0; j < sizes.length; j++)
+		out += "<div class='cfgbtn" + (brush.size == sizes[j][1] ? " sel" : "") + "' data-act='size' data-val='" + sizes[j][1] + "'>" + sizes[j][0] + "</div>";
+	out += "</div><div class='facerow'><div class='cfgbtn" + (brush.erase ? " sel" : "") + "' data-act='erase'>Erase</div><div class='cfgbtn' data-act='clear'>Clear</div></div><div class='cfgbtn' id='facedone' data-act='done'>Done</div>";
+	return out;
+}
+
+function renderFaceTools(){
+	var el = document.getElementById("facetools");
+	if(el)
+		el.innerHTML = faceToolsHtml();
+}
+
+function saveFace(){
+	var canvas = document.getElementById("facecanvas");
+	if(!canvas)
+		return;
+	var data = canvas.getContext("2d").getImageData(0, 0, FACE_SIZE, FACE_SIZE).data;
+	var blank = true;
+	for(var i = 3; i < data.length; i += 4){
+		if(data[i] > 0){
+			blank = false;
+			break;
+		}
+	}
+	faceData = blank ? null : cleanFace(canvas.toDataURL("image/png"));
+	updateFaceBtn();
+	saveProfile();
+}
+
+function paintFace(canvas, e){
+	var rect = canvas.getBoundingClientRect();
+	var x = (e.clientX - rect.left) / rect.width * FACE_SIZE;
+	var y = (e.clientY - rect.top) / rect.height * FACE_SIZE;
+	var ctx = canvas.getContext("2d");
+	ctx.globalCompositeOperation = brush.erase ? "destination-out" : "source-over";
+	ctx.strokeStyle = brush.color;
+	ctx.fillStyle = brush.color;
+	ctx.lineWidth = brush.size;
+	ctx.lineCap = "round";
+	ctx.lineJoin = "round";
+	ctx.beginPath();
+	if(brush.last){
+		ctx.moveTo(brush.last.x, brush.last.y);
+		ctx.lineTo(x, y);
+		ctx.stroke();
+	}else{
+		ctx.arc(x, y, brush.size / 2, 0, Math.PI * 2);
+		ctx.fill();
+	}
+	brush.last = {x: x, y: y};
+}
+
+function faceClick(e){
+	var t = e.target;
+	var act = t.getAttribute ? t.getAttribute("data-act") : null;
+	if(t.id == "facepad" || act == "done"){
+		closeFaceEditor();
+		return;
+	}
+	if(act == "color"){
+		brush.color = t.getAttribute("data-val");
+		brush.erase = false;
+	}else if(act == "size"){
+		brush.size = Number(t.getAttribute("data-val"));
+	}else if(act == "erase"){
+		brush.erase = !brush.erase;
+	}else if(act == "clear"){
+		var canvas = document.getElementById("facecanvas");
+		canvas.getContext("2d").clearRect(0, 0, FACE_SIZE, FACE_SIZE);
+		saveFace();
+	}else
+		return;
+	renderFaceTools();
+}
+
+function openFaceEditor(){
+	if(document.getElementById("facepad"))
+		return;
+	var el = document.createElement("DIV");
+	el.id = "facepad";
+	el.innerHTML = "<div id='facebox' class='title'><div id='facetitle'>Draw your face</div><div id='faceedit'><canvas id='facecanvas' width='" + FACE_SIZE + "' height='" + FACE_SIZE + "'></canvas><div id='facetools'></div></div></div>";
+	el.addEventListener("click", faceClick);
+	f.appendChild(el);
+	renderFaceTools();
+	var canvas = document.getElementById("facecanvas");
+	canvas.style.backgroundColor = "hsl(" + color + ", " + sat + "%, " + light + "%)";
+	if(faceData){
+		var img = new Image();
+		img.onload = function(){
+			canvas.getContext("2d").drawImage(img, 0, 0, FACE_SIZE, FACE_SIZE);
+		};
+		img.src = faceData;
+	}
+	canvas.addEventListener("pointerdown", function(e){
+		e.preventDefault();
+		if(canvas.setPointerCapture)
+			canvas.setPointerCapture(e.pointerId);
+		brush.last = null;
+		paintFace(canvas, e);
+	});
+	canvas.addEventListener("pointermove", function(e){
+		if(e.buttons == 1 || e.pointerType == "touch")
+			paintFace(canvas, e);
+	});
+	function stop(){
+		if(brush.last === null)
+			return;
+		brush.last = null;
+		saveFace();
+	}
+	canvas.addEventListener("pointerup", stop);
+	canvas.addEventListener("pointercancel", stop);
+}
+
+function closeFaceEditor(){
+	var el = document.getElementById("facepad");
+	if(el)
+		el.parentNode.removeChild(el);
+}
+
+function toggleView(){
+	frontView = !frontView;
+	snapCamera = true;
+	var b = document.getElementById("viewbtn");
+	if(b)
+		b.classList.toggle("on", frontView);
 }
 
 function randomName(){
@@ -176,6 +377,7 @@ function updateColor(){
 	satPicker.style.background = "linear-gradient(90deg, hsl(" + color + ", 0%, " + light + "%), hsl(" + color + ", 100%, " + light + "%))";
 	lightPicker.style.background = "linear-gradient(90deg, hsl(" + color + ", " + sat + "%, 0%), hsl(" + color + ", " + sat + "%, 50%), hsl(" + color + ", " + sat + "%, 100%))";
 	document.body.style.backgroundColor = "hsl(" + color + ", 50%, 50%)";
+	updateFaceBtn();
 	saveProfile();
 }
 bindPicker(huePicker, function(v){
@@ -276,7 +478,7 @@ function newPlayerData(){
 	};
 }
 
-function addPlayer(id, data, mine){
+function addPlayer(id, data, mine, face){
 	if(players[id])
 		return;
 	var pl = players[id] = {
@@ -306,6 +508,7 @@ function addPlayer(id, data, mine){
 	labels.push(label);
 	pl.model.receiveShadow = true;
 	scene.add(pl.model);
+	setFace(pl, face);
 	if(mine){
 		me.label = pl.label;
 		me.model = pl.model;
@@ -503,6 +706,8 @@ function startRace(c, it){
 
 	gameStarted = true;
 	gameSortaStarted = true;
+	frontView = false;
+	closeFaceEditor();
 
 	var countDown = document.createElement("DIV");
 	countDown.innerHTML = "3";
@@ -513,7 +718,7 @@ function startRace(c, it){
 	var bar = document.createElement("DIV");
 	bar.id = "topbar";
 	bar.className = "title";
-	bar.innerHTML = "<div id='dashlabel'>Dash</div><div id='dashbar'><div id='dashfill'></div></div><div id='leave' ontouchstart='this.click()' onclick='leaveGame()'>Leave</div>";
+	bar.innerHTML = "<div id='dashlabel'>Dash</div><div id='dashbar'><div id='dashfill'></div></div><div id='viewbtn' onclick='toggleView()'><svg viewBox='0 0 24 24'><circle cx='12' cy='12' r='9.5' fill='none' stroke='currentColor' stroke-width='2'/><circle cx='8.5' cy='10' r='1.5' fill='currentColor'/><circle cx='15.5' cy='10' r='1.5' fill='currentColor'/><path d='M7.5 14.5q4.5 4 9 0' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'/></svg></div><div id='leave' ontouchstart='this.click()' onclick='leaveGame()'>Leave</div>";
 	f.appendChild(bar);
 	dashFill = document.getElementById("dashfill");
 	var dashBar = document.getElementById("dashbar");
@@ -588,9 +793,13 @@ function hostMessage(conn, m){
 		d.x = carPos[count].x;
 		d.y = carPos[count].y;
 		net.conns[id] = conn;
-		addPlayer(id, d, false);
+		var fc = cleanFace(m.face);
+		addPlayer(id, d, false, fc);
 		conn.send({t: "y", id: id, p: snapshot()});
-		broadcast({t: "a", id: id, d: d}, id);
+		var fs = faceSnapshot();
+		for(var fid in fs)
+			conn.send({t: "f", id: fid, face: fs[fid]});
+		broadcast({t: "a", id: id, d: d, face: fc}, id);
 	}else if(m.t == "u"){
 		if(!players[id] || !m.d || typeof m.d != "object")
 			return;
@@ -674,7 +883,7 @@ function joinLobby(c, fail){
 				document.getElementById("trackcode").innerHTML = m.m;
 				deleteMap();
 				eval(loadMap());
-				conn.send({t: "j", d: {color: color, sat: sat, light: light, name: name}});
+				conn.send({t: "j", d: {color: color, sat: sat, light: light, name: name}, face: faceData});
 			}else if(m.t == "y"){
 				done = true;
 				joined = true;
@@ -688,15 +897,18 @@ function joinLobby(c, fail){
 						addPlayer(p, m.p[p], false);
 				}
 				me.data = m.p[m.id];
-				addPlayer(m.id, me.data, true);
+				addPlayer(m.id, me.data, true, faceData);
 			}else if(m.t == "a"){
-				addPlayer(m.id, m.d, false);
+				addPlayer(m.id, m.d, false, m.face);
 			}else if(m.t == "u"){
 				if(m.id != me.id && players[m.id])
 					players[m.id].data = m.d;
 			}else if(m.t == "r"){
 				if(m.id != me.id)
 					removePlayer(m.id);
+			}else if(m.t == "f"){
+				if(players[m.id] && !players[m.id].face)
+					setFace(players[m.id], m.face);
 			}else if(m.t == "tag"){
 				tagPlayer(m.id);
 			}else if(m.t == "end"){
@@ -719,7 +931,7 @@ function host(){
 			document.getElementById("code").innerHTML = code;
 			me.id = net.peer.id;
 			me.data = newPlayerData();
-			addPlayer(me.id, me.data, true);
+			addPlayer(me.id, me.data, true, faceData);
 		});
 	}, 1000);
 
@@ -1096,11 +1308,16 @@ function join(){
 					checkTags();
 			}
 
+			var viewSign = frontView ? -1 : 1;
 			var target = new THREE.Vector3(
-				me.model.position.x + Math.sin(-me.model.rotation.y) * 5,
+				me.model.position.x + Math.sin(-me.model.rotation.y) * 5 * viewSign,
 				3,
-				me.model.position.z + -Math.cos(-me.model.rotation.y) * 5
+				me.model.position.z + -Math.cos(-me.model.rotation.y) * 5 * viewSign
 			);
+			if(snapCamera){
+				camera.position.set(target.x, 3, target.z);
+				snapCamera = false;
+			}
 			camera.position.set(
 				camera.position.x * Math.pow(CAMERA_LAG, warp) + target.x * (1 - Math.pow(CAMERA_LAG, warp)),
 				3,
@@ -1200,6 +1417,8 @@ window.onkeydown = function(e){
 		right = true;
 	if(e.keyCode == 69)
 		dashKey = true;
+	if(e.keyCode == 70 && gameStarted && !e.repeat)
+		toggleView();
 }
 
 window.onkeyup = function(e){
