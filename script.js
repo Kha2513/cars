@@ -8,6 +8,11 @@ var WALL_SIZE = 1.2;
 var MOUNTAIN_DIST = 250;
 var OOB_DIST = 200;
 var LAPS = 3;
+var BASE_FOV = 90;
+var DASH_FOV = 110;
+var DASH_BOOST = 2;
+var DASH_DRAIN = 0.012;
+var DASH_REGEN = 0.004;
 function MODS(){
 
 }
@@ -73,6 +78,7 @@ function toggleFullScreen() {
 }
 
 var name, code, players = {}, me = {}, gameStarted = false, gameSortaStarted = false, left = false, right = false, lap;
+var dashKey = false, dashTouch = false, dashEnergy = 1, dashLocked = false, dashFill;
 var carPos = [
 	{x: 0, y: 0},
 	{x: 2, y: 0},
@@ -177,6 +183,7 @@ function newPlayerData(){
 		yv: 0,
 		dir: 0,
 		steer: 0,
+		dash: 0,
 		color: color,
 		name: name,
 		checkpoint: 1,
@@ -221,6 +228,25 @@ function addPlayer(id, data, mine){
 	}
 }
 
+function removePlayer(id){
+	var pl = players[id];
+	if(!pl)
+		return;
+	scene.remove(pl.model);
+	if(pl.label.parentNode)
+		pl.label.parentNode.removeChild(pl.label);
+	var i = labels.indexOf(pl.label);
+	if(i >= 0)
+		labels.splice(i, 1);
+	delete players[id];
+}
+
+function leaveGame(){
+	if(net.peer)
+		net.peer.destroy();
+	location.reload();
+}
+
 function startRace(){
 	if(gameStarted)
 		return;
@@ -239,6 +265,26 @@ function startRace(){
 	countDown.className = "title";
 	countDown.id = "countdown";
 	f.appendChild(countDown);
+
+	var bar = document.createElement("DIV");
+	bar.id = "topbar";
+	bar.className = "title";
+	bar.innerHTML = "<div id='dashlabel'>Dash</div><div id='dashbar'><div id='dashfill'></div></div><div id='leave' ontouchstart='this.click()' onclick='leaveGame()'>Leave</div>";
+	f.appendChild(bar);
+	dashFill = document.getElementById("dashfill");
+	var dashBar = document.getElementById("dashbar");
+	function dashOn(e){
+		e.preventDefault();
+		dashTouch = true;
+	}
+	function dashOff(){
+		dashTouch = false;
+	}
+	dashBar.addEventListener("touchstart", dashOn);
+	dashBar.addEventListener("touchend", dashOff);
+	dashBar.addEventListener("touchcancel", dashOff);
+	dashBar.addEventListener("mousedown", dashOn);
+	window.addEventListener("mouseup", dashOff);
 
 	lap = document.createElement("DIV");
 	lap.innerHTML = "1/" + LAPS;
@@ -324,14 +370,18 @@ function startHosting(onCode){
 			hostMessage(conn, m);
 		});
 		conn.on("close", function(){
-			if(net.conns[conn.peer] === conn)
+			if(net.conns[conn.peer] === conn){
 				delete net.conns[conn.peer];
+				removePlayer(conn.peer);
+				broadcast({t: "r", id: conn.peer});
+			}
 		});
 	});
 }
 
 function joinLobby(c, fail){
 	var done = false;
+	var joined = false;
 	var peer = new Peer();
 	var timer = setTimeout(bail, 10000);
 	function bail(){
@@ -346,7 +396,12 @@ function joinLobby(c, fail){
 	peer.on("open", function(){
 		var conn = peer.connect(PEER_PREFIX + c, {serialization: "json"});
 		conn.on("error", bail);
-		conn.on("close", bail);
+		conn.on("close", function(){
+			if(joined)
+				location.reload();
+			else
+				bail();
+		});
 		conn.on("data", function(m){
 			if(!m || typeof m != "object")
 				return;
@@ -362,6 +417,7 @@ function joinLobby(c, fail){
 				conn.send({t: "j", d: {color: color, name: name}});
 			}else if(m.t == "y"){
 				done = true;
+				joined = true;
 				clearTimeout(timer);
 				net.peer = peer;
 				net.hostConn = conn;
@@ -378,6 +434,9 @@ function joinLobby(c, fail){
 			}else if(m.t == "u"){
 				if(m.id != me.id && players[m.id])
 					players[m.id].data = m.d;
+			}else if(m.t == "r"){
+				if(m.id != me.id)
+					removePlayer(m.id);
 			}else if(m.t == "s"){
 				startRace();
 			}
@@ -626,6 +685,18 @@ function join(){
 			}
 			me.data.steer = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, me.data.steer));
 
+			var wantDash = (dashKey || dashTouch) && !gameSortaStarted;
+			if(dashLocked && dashEnergy >= 0.25)
+				dashLocked = false;
+			me.data.dash = wantDash && !dashLocked && dashEnergy > 0 ? 1 : 0;
+			if(me.data.dash){
+				dashEnergy = Math.max(0, dashEnergy - DASH_DRAIN * warp);
+				if(dashEnergy == 0)
+					dashLocked = true;
+			}else
+				dashEnergy = Math.min(1, dashEnergy + DASH_REGEN * warp);
+			dashFill.style.width = dashEnergy * 100 + "%";
+
 			players[me.id].data = me.data;
 
 			if(!gameSortaStarted){
@@ -634,8 +705,9 @@ function join(){
 
 					play.data.dir += play.data.steer / 10 * warp;
 
-					play.data.xv += Math.sin(play.data.dir) * SPEED * warp;
-					play.data.yv += Math.cos(play.data.dir) * SPEED * warp;
+					var accel = play.data.dash ? SPEED * DASH_BOOST : SPEED;
+					play.data.xv += Math.sin(play.data.dir) * accel * warp;
+					play.data.yv += Math.cos(play.data.dir) * accel * warp;
 
 					play.data.xv *= Math.pow(0.99, warp);
 					play.data.yv *= Math.pow(0.99, warp);
@@ -768,6 +840,7 @@ function join(){
 				camera.position.z * Math.pow(CAMERA_LAG, warp) + target.z * (1 - Math.pow(CAMERA_LAG, warp))
 			);
 			camera.lookAt(me.model.position);
+			camera.fov += ((me.data.dash ? DASH_FOV : BASE_FOV) - camera.fov) * (1 - Math.pow(0.9, warp));
 
 			sendMe();
 
@@ -847,6 +920,8 @@ window.onkeydown = function(e){
 		left = true;
 	if(e.keyCode == 39)
 		right = true;
+	if(e.keyCode == 69)
+		dashKey = true;
 }
 
 window.onkeyup = function(e){
@@ -854,6 +929,8 @@ window.onkeyup = function(e){
 		left = false;
 	if(e.keyCode == 39)
 		right = false;
+	if(e.keyCode == 69)
+		dashKey = false;
 }
 
 if(mobile){
