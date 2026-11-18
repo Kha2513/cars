@@ -57,7 +57,6 @@ if(!mobile){
 	renderer.shadowMap.autoUpdate = false;
 	renderer.shadowMap.needsUpdate = true;
 	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-	console.log(mobile);
 }
 var element = renderer.domElement;
 
@@ -108,9 +107,10 @@ function clampNum(v, lo, hi, def){
 	return isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def;
 }
 
-color = Math.floor(Math.random() * 360);
+var color = Math.floor(Math.random() * 360);
 var f = document.getElementById("fore");
-var s = document.getElementById("slider");
+var huePicker = document.getElementById("colorpicker");
+var hueSlider = document.getElementById("slider");
 var satSlider = document.getElementById("satslider");
 var lightSlider = document.getElementById("lightslider");
 var satPicker = document.getElementById("satpicker");
@@ -161,19 +161,22 @@ function bindPicker(el, set){
 	});
 }
 
-updateColor = function(){
+function updateColor(){
 	var car = "hsl(" + color + ", " + sat + "%, " + light + "%)";
-	s.style.marginLeft = color / 360 * 80 + "vw";
-	s.style.backgroundColor = car;
-	satSlider.style.marginLeft = sat / 100 * 80 + "vw";
+	hueSlider.style.marginLeft = color / 360 * 100 + "%";
+	hueSlider.style.backgroundColor = car;
+	satSlider.style.marginLeft = sat / 100 * 100 + "%";
 	satSlider.style.backgroundColor = car;
-	lightSlider.style.marginLeft = light / 100 * 80 + "vw";
+	lightSlider.style.marginLeft = light / 100 * 100 + "%";
 	lightSlider.style.backgroundColor = car;
 	satPicker.style.background = "linear-gradient(90deg, hsl(" + color + ", 0%, " + light + "%), hsl(" + color + ", 100%, " + light + "%))";
 	lightPicker.style.background = "linear-gradient(90deg, hsl(" + color + ", " + sat + "%, 0%), hsl(" + color + ", " + sat + "%, 50%), hsl(" + color + ", " + sat + "%, 100%))";
 	document.body.style.backgroundColor = "hsl(" + color + ", 50%, 50%)";
 	saveProfile();
 }
+bindPicker(huePicker, function(v){
+	color = Math.floor(v * 360);
+});
 bindPicker(satPicker, function(v){
 	sat = Math.round(v * 100);
 });
@@ -184,7 +187,7 @@ nameBox.addEventListener("input", saveProfile);
 loadProfile();
 updateColor();
 
-menu2 = function(){
+function menu2(){
 	if(mobile){
 		function reactOrientation(e){
 			var angle = screen.orientation.type == "portrait-primary" ? e.gamma : screen.orientation.type == "portrait-secondary" ? -e.gamma : screen.orientation.type == "landscape-primary" ? e.beta : screen.orientation.type == "landscape-secondary" ? -e.beta : 0;
@@ -523,7 +526,7 @@ function joinLobby(c, fail){
 	});
 }
 
-host = function(){
+function host(){
 	document.getElementById("host").onclick = null;
 	f.style.transform = "translate3d(0, -100vh, 0)";
 	setTimeout(function(){
@@ -541,11 +544,11 @@ host = function(){
 	join();
 }
 
-joinGame = function(){
+function joinGame(){
 	document.getElementById("join").onclick = null;
 	f.style.transform = "translate3d(0, -100vh, 0)";
 	setTimeout(function(){
-		f.innerHTML = "<div class='info title'>Enter a code to join a game!<input id='incode' class='title' onkeyup='codeCheck(event)' ontouchstart='this.focus()'></input></div>";
+		f.innerHTML = "<div class='info title'>Enter a code to join a game!<input id='incode' class='title' onkeyup='codeCheck(event)' ontouchstart='this.focus()'></div>";
 		f.appendChild(element);
 		f.style.transform = "none";
 	}, 1000);
@@ -713,19 +716,19 @@ function join(){
 
 	scene.add(player);
 
-	var light = new THREE.DirectionalLight(0xffffff, 0.7);
-	light.position.set(3000, 2000, -2000);
-	light.castShadow = true;
-	light.shadow.mapSize.width = 2048;
-	light.shadow.mapSize.height = 2048;
-	light.shadow.camera.near = 3000;
-	light.shadow.camera.far = 5000;
-	light.shadow.camera.top = 100;
-	light.shadow.camera.bottom = -100;
-	light.shadow.camera.left = -100;
-	light.shadow.camera.right = 120;
-	light.shadow.bias = 0.00002;
-	scene.add(light);
+	var sun = new THREE.DirectionalLight(0xffffff, 0.7);
+	sun.position.set(3000, 2000, -2000);
+	sun.castShadow = true;
+	sun.shadow.mapSize.width = 2048;
+	sun.shadow.mapSize.height = 2048;
+	sun.shadow.camera.near = 3000;
+	sun.shadow.camera.far = 5000;
+	sun.shadow.camera.top = 100;
+	sun.shadow.camera.bottom = -100;
+	sun.shadow.camera.left = -100;
+	sun.shadow.camera.right = 120;
+	sun.shadow.bias = 0.00002;
+	scene.add(sun);
 	scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
 	var x = 0;
@@ -948,7 +951,7 @@ function join(){
 				label.style.display = "none";
 		}
 
-		if(windowsize.x != window.innerWidth || windowsize.x != window.innerHeight){
+		if(windowsize.x != window.innerWidth || windowsize.y != window.innerHeight){
 			windowsize = {x: window.innerWidth, y: window.innerHeight};
 			onWindowResize();
 		}
@@ -971,7 +974,7 @@ function join(){
 		setTimeout(orientCamera, 0);
 	}
 }
-codeCheck = function(){
+function codeCheck(){
 	var incode = document.getElementById("incode");
 	if(incode.value.length == 4){
 		incode.onkeyup = null;
@@ -1010,10 +1013,6 @@ window.onkeyup = function(e){
 		right = false;
 	if(e.keyCode == 69)
 		dashKey = false;
-}
-
-if(mobile){
-
 }
 
 document.body.onkeydown = function(e){
