@@ -8,10 +8,6 @@ var WALL_SIZE = 1.2;
 var MOUNTAIN_DIST = 250;
 var OOB_DIST = 200;
 var LAPS = 3;
-var GAME_MODE = "racing";
-var CAR_SPEED_MULT = 1;
-var TAG_TIME = 60;
-var TAG_TIME_LEFT = 60;
 var BASE_FOV = 90;
 var DASH_FOV = 110;
 var DASH_BOOST = 2;
@@ -81,6 +77,10 @@ function toggleFullScreen() {
 }
 
 var name, code, players = {}, me = {}, gameStarted = false, gameSortaStarted = false, left = false, right = false, lap;
+var gameMode = "race", gameOver = false, speedMul = 1, tagTime = 120, tagEndsAt = 0, runnersAtStart = 0, roleEl, roleTimer;
+var TAG_DIST = 2.3;
+var CFG_LIMITS = {laps: [1, 20, 1], speed: [50, 150, 10], time: [30, 600, 15]};
+var cfg = {mode: "race", laps: LAPS, speed: 100, time: 120};
 var dashKey = false, dashTouch = false, dashEnergy = 1, dashLocked = false, dashFill;
 var carPos = [
 	{x: 0, y: 0},
@@ -272,7 +272,6 @@ function newPlayerData(){
 		name: name,
 		checkpoint: 1,
 		lap: 0,
-		isIt: false,
 		collision: {}
 	};
 }
@@ -282,6 +281,7 @@ function addPlayer(id, data, mine){
 		return;
 	var pl = players[id] = {
 		data: data,
+		it: false,
 		model: new THREE.Mesh(new THREE.BoxBufferGeometry(1, 1, 2))
 	};
 	pl.model.position.set(pl.data.x, 0.6, pl.data.y);
@@ -297,13 +297,6 @@ function addPlayer(id, data, mine){
 		w.rotation.set(Math.PI / 2, 0, Math.PI / 2);
 		pl.model.add(w);
 	}
-	var outlineGeo = new THREE.BoxBufferGeometry(1.2, 1.2, 2.2);
-	var outlineMat = new THREE.MeshBasicMaterial({color: 0xff0000, wireframe: true});
-	var outlineMesh = new THREE.Mesh(outlineGeo, outlineMat);
-	outlineMesh.name = "outline";
-	outlineMesh.visible = pl.data.isIt;
-	pl.model.add(outlineMesh);
-
 	var label = document.createElement("DIV");
 	label.className = "label";
 	label.innerHTML = String(pl.data.name).replaceAll("<", "&lt;").substring(0, 50) + "<br/>|";
@@ -339,74 +332,177 @@ function leaveGame(){
 	location.reload();
 }
 
+function sanitizeCfg(c){
+	c = c || {};
+	return {
+		mode: c.mode == "tag" ? "tag" : "race",
+		laps: Math.round(clampNum(c.laps, CFG_LIMITS.laps[0], CFG_LIMITS.laps[1], 3)),
+		speed: Math.round(clampNum(c.speed, CFG_LIMITS.speed[0], CFG_LIMITS.speed[1], 100)),
+		time: Math.round(clampNum(c.time, CFG_LIMITS.time[0], CFG_LIMITS.time[1], 120))
+	};
+}
+
+function fmtTime(sec){
+	return Math.floor(sec / 60) + ":" + ("0" + sec % 60).slice(-2);
+}
+
+function cfgHtml(){
+	var tag = cfg.mode == "tag";
+	function row(label, ctl){
+		return "<div class='cfgrow'><div class='cfglabel'>" + label + "</div><div class='cfgctl'>" + ctl + "</div></div>";
+	}
+	function step(key, text){
+		return "<div class='cfgbtn sq' data-act='step' data-key='" + key + "' data-dir='-1'>-</div><div class='cfgval'>" + text + "</div><div class='cfgbtn sq' data-act='step' data-key='" + key + "' data-dir='1'>+</div>";
+	}
+	var modes = "<div class='cfgbtn" + (tag ? "" : " sel") + "' data-act='mode' data-val='race'>Racing</div><div class='cfgbtn" + (tag ? " sel" : "") + "' data-act='mode' data-val='tag'>Tag</div>";
+	return "<div id='cfgbox' class='title'><div id='cfgtitle'>Settings</div>"
+		+ row("Mode", modes)
+		+ (tag ? row("Time", step("time", fmtTime(cfg.time))) : row("Laps", step("laps", cfg.laps)))
+		+ row("Speed", step("speed", cfg.speed + "%"))
+		+ "<div class='cfgbtn' id='cfgdone' data-act='done'>Done</div></div>";
+}
+
+function renderCfg(){
+	var el = document.getElementById("cfg");
+	if(el)
+		el.innerHTML = cfgHtml();
+}
+
+function cfgClick(e){
+	var t = e.target;
+	var act = t.getAttribute ? t.getAttribute("data-act") : null;
+	if(t.id == "cfg" || act == "done"){
+		closeSettings();
+		return;
+	}
+	if(act == "mode"){
+		cfg.mode = t.getAttribute("data-val") == "tag" ? "tag" : "race";
+	}else if(act == "step"){
+		var key = t.getAttribute("data-key");
+		var lim = CFG_LIMITS[key];
+		if(!lim)
+			return;
+		cfg[key] = Math.min(lim[1], Math.max(lim[0], cfg[key] + Number(t.getAttribute("data-dir")) * lim[2]));
+	}else
+		return;
+	renderCfg();
+}
+
 function openSettings(){
-	var modal = document.getElementById("settings-modal");
-	if(!modal){
-		modal = document.createElement("DIV");
-		modal.id = "settings-modal";
-		modal.innerHTML = "<div class='modal-content title'><h2>Lobby Settings</h2><label>Mode: <select id='set-mode'><option value='racing'>Racing Mode</option><option value='tag'>Tag Mode</option></select></label><label>Goal Laps: <input type='number' id='set-laps' value='" + LAPS + "' min='1'></label><label>Car Speed Multiplier: <input type='number' id='set-speed' value='" + CAR_SPEED_MULT + "' step='0.1' min='0.5' max='3'></label><label>Tag Time (s): <input type='number' id='set-time' value='" + TAG_TIME + "' min='10'></label><div id='set-save' class='title' style='cursor:pointer; text-align:center; padding:1.5vmin 2vmin; border:1vmin solid white; background:rgba(0,0,0,0.5);'>Save & Close</div></div>";
-		document.body.appendChild(modal);
-		document.getElementById("set-save").onclick = function(){
-			GAME_MODE = document.getElementById("set-mode").value;
-			LAPS = parseInt(document.getElementById("set-laps").value) || 3;
-			CAR_SPEED_MULT = parseFloat(document.getElementById("set-speed").value) || 1;
-			TAG_TIME = parseInt(document.getElementById("set-time").value) || 60;
-			modal.style.display = "none";
-			broadcast({t: "settings", d: {mode: GAME_MODE, laps: LAPS, speed: CAR_SPEED_MULT, time: TAG_TIME}});
-		};
-	}
-	document.getElementById("set-mode").value = GAME_MODE;
-	document.getElementById("set-laps").value = LAPS;
-	document.getElementById("set-speed").value = CAR_SPEED_MULT;
-	document.getElementById("set-time").value = TAG_TIME;
-	modal.style.display = "flex";
+	if(document.getElementById("cfg"))
+		return;
+	var el = document.createElement("DIV");
+	el.id = "cfg";
+	el.addEventListener("click", cfgClick);
+	f.appendChild(el);
+	renderCfg();
 }
 
-function updateRoleBanner(){
-	var banner = document.getElementById("role-banner");
-	if(!banner){
-		banner = document.createElement("DIV");
-		banner.id = "role-banner";
-		document.body.appendChild(banner);
+function closeSettings(){
+	var el = document.getElementById("cfg");
+	if(el)
+		el.parentNode.removeChild(el);
+}
+
+function setOutline(pl, on){
+	if(on && !pl.outline){
+		pl.outline = new THREE.Mesh(
+			new THREE.BoxBufferGeometry(1.4, 1.4, 2.4),
+			new THREE.MeshBasicMaterial({color: new THREE.Color("#fff"), side: THREE.BackSide})
+		);
+		pl.model.add(pl.outline);
+	}else if(!on && pl.outline){
+		pl.model.remove(pl.outline);
+		pl.outline = null;
 	}
-	if(GAME_MODE === "tag" && gameStarted){
-		var myData = players[me.id] ? players[me.id].data : me.data;
-		if(myData && myData.isIt){
-			banner.innerHTML = "YOU ARE IT!";
-			banner.style.color = "#ff3333";
-		} else {
-			banner.innerHTML = "YOU ARE A RUNNER!";
-			banner.style.color = "#33ccff";
+}
+
+function showRole(){
+	if(gameMode != "tag" || !roleEl || !players[me.id])
+		return;
+	var it = players[me.id].it;
+	roleEl.innerHTML = it ? "You are it" : "You are a runner";
+	roleEl.className = (it ? "title it big" : "title big");
+	clearTimeout(roleTimer);
+	roleTimer = setTimeout(function(){
+		roleEl.classList.remove("big");
+	}, 2500);
+}
+
+function tagPlayer(id){
+	var pl = players[id];
+	if(!pl || pl.it)
+		return;
+	pl.it = true;
+	setOutline(pl, true);
+	if(id == me.id)
+		showRole();
+}
+
+function endTag(w){
+	gameOver = true;
+	var c = document.getElementById("countdown");
+	if(!c)
+		return;
+	c.style.fontSize = "18vmin";
+	c.innerHTML = w == "it" ? "It wins!" : w == "runners" ? "Runners win!" : "Time!";
+}
+
+function finishTag(w){
+	if(gameOver)
+		return;
+	endTag(w);
+	broadcast({t: "end", w: w});
+}
+
+function checkTags(){
+	var ids = Object.keys(players);
+	var tagged = [];
+	for(var i = 0; i < ids.length; i++){
+		var a = players[ids[i]];
+		if(!a.it)
+			continue;
+		for(var j = 0; j < ids.length; j++){
+			var b = players[ids[j]];
+			if(b.it || tagged.indexOf(ids[j]) >= 0)
+				continue;
+			if(a.model.position.distanceTo(b.model.position) < TAG_DIST)
+				tagged.push(ids[j]);
 		}
-	} else {
-		banner.innerHTML = "";
 	}
+	for(var k = 0; k < tagged.length; k++){
+		tagPlayer(tagged[k]);
+		broadcast({t: "tag", id: tagged[k]});
+	}
+	var runners = 0;
+	for(var id in players){
+		if(!players[id].it)
+			runners++;
+	}
+	if(runnersAtStart > 0 && runners == 0)
+		finishTag("it");
+	else if(Date.now() >= tagEndsAt)
+		finishTag(runners > 0 ? "runners" : "time");
 }
 
-function startRace(){
+function startRace(c, it){
 	if(gameStarted)
 		return;
+	c = sanitizeCfg(c);
+	gameMode = c.mode;
+	LAPS = c.laps;
+	speedMul = c.speed / 100;
+	tagTime = c.time;
+	closeSettings();
 	var info = document.getElementsByClassName("info")[0];
 	if(info)
 		info.outerHTML = "";
-	var hostActions = document.getElementById("host-actions");
-	if(hostActions)
-		hostActions.outerHTML = "";
+	var hb = document.getElementById("hostbar");
+	if(hb)
+		hb.outerHTML = "";
 
 	gameStarted = true;
 	gameSortaStarted = true;
-
-	if(net.isHost && GAME_MODE === "tag"){
-		var pKeys = Object.keys(players);
-		if(pKeys.length > 0){
-			var initialIt = pKeys[Math.floor(Math.random() * pKeys.length)];
-			players[initialIt].data.isIt = true;
-			broadcast({t: "tag", it: initialIt});
-		}
-		TAG_TIME_LEFT = TAG_TIME;
-	}
-
-	updateRoleBanner();
 
 	var countDown = document.createElement("DIV");
 	countDown.innerHTML = "3";
@@ -435,10 +531,24 @@ function startRace(){
 	window.addEventListener("mouseup", dashOff);
 
 	lap = document.createElement("DIV");
-	lap.innerHTML = GAME_MODE === "tag" ? "Tag Mode" : "1/" + LAPS;
+	lap.innerHTML = "1/" + LAPS;
 	lap.className = "title";
 	lap.id = "lap";
 	f.appendChild(lap);
+
+	if(gameMode == "tag"){
+		lap.innerHTML = fmtTime(tagTime);
+		lap.className = "title timer";
+		roleEl = document.createElement("DIV");
+		roleEl.id = "role";
+		f.appendChild(roleEl);
+		tagEndsAt = Date.now() + 3000 + tagTime * 1000;
+		if(it && players[it]){
+			players[it].it = true;
+			setOutline(players[it], true);
+		}
+		showRole();
+	}
 
 	setTimeout(function(){
 		countDown.innerHTML = "2";
@@ -479,7 +589,7 @@ function hostMessage(conn, m){
 		d.y = carPos[count].y;
 		net.conns[id] = conn;
 		addPlayer(id, d, false);
-		conn.send({t: "y", id: id, p: snapshot(), settings: {mode: GAME_MODE, laps: LAPS, speed: CAR_SPEED_MULT, time: TAG_TIME}});
+		conn.send({t: "y", id: id, p: snapshot()});
 		broadcast({t: "a", id: id, d: d}, id);
 	}else if(m.t == "u"){
 		if(!players[id] || !m.d || typeof m.d != "object")
@@ -514,7 +624,7 @@ function startHosting(onCode){
 	});
 	peer.on("connection", function(conn){
 		conn.on("open", function(){
-			conn.send({t: "w", s: net.status, m: document.getElementById("trackcode").innerHTML, settings: {mode: GAME_MODE, laps: LAPS, speed: CAR_SPEED_MULT, time: TAG_TIME}});
+			conn.send({t: "w", s: net.status, m: document.getElementById("trackcode").innerHTML});
 		});
 		conn.on("data", function(m){
 			hostMessage(conn, m);
@@ -560,12 +670,6 @@ function joinLobby(c, fail){
 					bail();
 					return;
 				}
-				if(m.settings){
-					GAME_MODE = m.settings.mode;
-					LAPS = m.settings.laps;
-					CAR_SPEED_MULT = m.settings.speed;
-					TAG_TIME = m.settings.time;
-				}
 				document.getElementsByClassName("info")[0].innerHTML = "<div class='info title'>Waiting for the game to start...<div id='code'>" + c + "</div></div>";
 				document.getElementById("trackcode").innerHTML = m.m;
 				deleteMap();
@@ -579,12 +683,6 @@ function joinLobby(c, fail){
 				net.hostConn = conn;
 				net.isHost = false;
 				me.id = m.id;
-				if(m.settings){
-					GAME_MODE = m.settings.mode;
-					LAPS = m.settings.laps;
-					CAR_SPEED_MULT = m.settings.speed;
-					TAG_TIME = m.settings.time;
-				}
 				for(var p in m.p){
 					if(p != m.id)
 						addPlayer(p, m.p[p], false);
@@ -599,19 +697,12 @@ function joinLobby(c, fail){
 			}else if(m.t == "r"){
 				if(m.id != me.id)
 					removePlayer(m.id);
-			}else if(m.t == "s"){
-				startRace();
-			}else if(m.t == "settings"){
-				GAME_MODE = m.d.mode;
-				LAPS = m.d.laps;
-				CAR_SPEED_MULT = m.d.speed;
-				TAG_TIME = m.d.time;
 			}else if(m.t == "tag"){
-				for(var id in players)
-					players[id].data.isIt = (id === m.it);
-				if(me.data)
-					me.data.isIt = (me.id === m.it);
-				updateRoleBanner();
+				tagPlayer(m.id);
+			}else if(m.t == "end"){
+				endTag(m.w);
+			}else if(m.t == "s"){
+				startRace(m.cfg, m.it);
 			}
 		});
 	});
@@ -621,7 +712,7 @@ function host(){
 	document.getElementById("host").onclick = null;
 	f.style.transform = "translate3d(0, -100vh, 0)";
 	setTimeout(function(){
-		f.innerHTML = "<div class='info title'>Use this code to join the game!<div id='code'>Loading...</div></div><div id='host-actions'><div id='settingsbtn' class='title' onclick='openSettings()' ontouchstart='this.click()'>Settings</div><div id='startgame' class='title' onclick='startGame()' ontouchstart='this.click()'>Start!</div></div>";
+		f.innerHTML = "<div class='info title'>Use this code to join the game!<div id='code'>Loading...</div></div><div id='hostbar'><div id='lobbysettings' onclick='openSettings()'></div><div id='startgame' class='title' onclick='startGame()' ontouchstart='this.click()'>Start!</div></div>";
 		f.appendChild(element);
 		f.style.transform = "none";
 		startHosting(function(){
@@ -878,7 +969,7 @@ function join(){
 
 					play.data.dir += play.data.steer / 10 * warp;
 
-					var accel = play.data.dash ? SPEED * DASH_BOOST * CAR_SPEED_MULT : SPEED * CAR_SPEED_MULT;
+					var accel = SPEED * speedMul * (play.data.dash ? DASH_BOOST : 1);
 					play.data.xv += Math.sin(play.data.dir) * accel * warp;
 					play.data.yv += Math.cos(play.data.dir) * accel * warp;
 
@@ -894,10 +985,6 @@ function join(){
 
 					play.model.children[0].rotation.z = Math.PI / 2 - play.data.steer;
 					play.model.children[1].rotation.z = Math.PI / 2 - play.data.steer;
-
-					var outline = play.model.getObjectByName("outline");
-					if(outline)
-						outline.visible = play.data.isIt;
 
 					for(var w in map.children){
 						var wall = map.children[w];
@@ -948,44 +1035,29 @@ function join(){
 						}
 					}
 
-					if(GAME_MODE === "racing"){
-						for(var i in startc.children){
-							var cp = startc.children[i];
-							if(Math.abs(cp.plane.distanceToPoint(play.model.position.clone().sub(cp.position))) < 1){
-								if(cp.position.clone().distanceTo(play.model.position) < cp.width / 2 + 1){
-									if(i == 0){
-										if(play.data.checkpoint == 1){
-											play.data.checkpoint = 0;
-											play.data.lap++;
-										}
-									}else
-										play.data.checkpoint = 1;
-								}
+					for(var i in startc.children){
+						var cp = startc.children[i];
+						if(Math.abs(cp.plane.distanceToPoint(play.model.position.clone().sub(cp.position))) < 1){
+							if(cp.position.clone().distanceTo(play.model.position) < cp.width / 2 + 1){
+								if(i == 0){
+									if(play.data.checkpoint == 1){
+										play.data.checkpoint = 0;
+										play.data.lap++;
+									}
+								}else
+									play.data.checkpoint = 1;
 							}
 						}
+					}
 
-						if(play.data.lap > LAPS && document.getElementById("countdown").innerHTML == ""){
-							document.getElementById("countdown").style.fontSize = "25vmin";
-							document.getElementById("countdown").innerHTML = play.data.name.replaceAll("<", "&lt;") + " Won!";
-						}
+					if(gameMode == "race" && play.data.lap > LAPS && document.getElementById("countdown").innerHTML == ""){
+						document.getElementById("countdown").style.fontSize = "25vmin";
+						document.getElementById("countdown").innerHTML = play.data.name.replaceAll("<", "&lt;") + " Won!";
 					}
 
 					for(var pl in players){
 						if(play != players[pl] && play.model.position.distanceTo(players[pl].model.position) < 2){
 							var ply = players[pl];
-							if(GAME_MODE === "tag" && net.isHost){
-								if(play.data.isIt && !ply.data.isIt){
-									play.data.isIt = false;
-									ply.data.isIt = true;
-									broadcast({t: "tag", it: pl});
-									updateRoleBanner();
-								} else if(!play.data.isIt && ply.data.isIt){
-									ply.data.isIt = false;
-									play.data.isIt = true;
-									broadcast({t: "tag", it: p});
-									updateRoleBanner();
-								}
-							}
 							var temp = new THREE.Vector2(play.data.xv, play.data.yv);
 							var temp2 = new THREE.Vector2(ply.data.xv, ply.data.yv);
 							ply.data.xv -= temp.x;
@@ -1019,6 +1091,9 @@ function join(){
 						play.data.y = 0;
 					}
 				}
+
+				if(net.isHost && gameMode == "tag" && !gameOver)
+					checkTags();
 			}
 
 			var target = new THREE.Vector3(
@@ -1036,9 +1111,10 @@ function join(){
 
 			sendMe();
 
-			if(GAME_MODE === "racing"){
+			if(gameMode == "tag")
+				lap.innerHTML = fmtTime(Math.min(tagTime, Math.max(0, Math.ceil((tagEndsAt - Date.now()) / 1000))));
+			else
 				lap.innerHTML = me.data.lap <= LAPS ? me.data.lap + "/" + LAPS : "";
-			}
 		}else{
 			camera.position.set(50 * Math.sin(x), 20, 50 * Math.cos(x));
 			camera.lookAt(player.position);
@@ -1105,8 +1181,16 @@ function startGame(){
 	if(!net.isHost || net.status !== 0)
 		return;
 	net.status = 1;
-	broadcast({t: "s"});
-	startRace();
+	var c = sanitizeCfg(cfg);
+	var it = null;
+	runnersAtStart = 0;
+	if(c.mode == "tag"){
+		var ids = Object.keys(players);
+		it = ids[Math.floor(Math.random() * ids.length)];
+		runnersAtStart = ids.length - 1;
+	}
+	broadcast({t: "s", cfg: c, it: it});
+	startRace(c, it);
 }
 
 window.onkeydown = function(e){
