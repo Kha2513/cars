@@ -260,6 +260,8 @@ function newPlayerData(){
 		steer: 0,
 		dash: 0,
 		color: color,
+		sat: sat,
+		light: light,
 		name: name,
 		checkpoint: 1,
 		lap: 0,
@@ -275,7 +277,7 @@ function addPlayer(id, data, mine){
 		model: new THREE.Mesh(new THREE.BoxBufferGeometry(1, 1, 2))
 	};
 	pl.model.position.set(pl.data.x, 0.6, pl.data.y);
-	pl.model.material = new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + pl.data.color + ", 100%, 50%)")});
+	pl.model.material = new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + clampNum(pl.data.color, 0, 360, 0) + ", " + clampNum(pl.data.sat, 0, 100, 100) + "%, " + clampNum(pl.data.light, 0, 100, 50) + "%)")});
 	var wheel = new THREE.Mesh(
 		new THREE.CylinderBufferGeometry(0.5, 0.5, 0.2, 10),
 		new THREE.MeshLambertMaterial({color: new THREE.Color("#222")})
@@ -398,7 +400,9 @@ function hostMessage(conn, m){
 			return;
 		}
 		var d = newPlayerData();
-		d.color = Number(m.d && m.d.color) || 0;
+		d.color = clampNum(m.d && m.d.color, 0, 360, 0);
+		d.sat = clampNum(m.d && m.d.sat, 0, 100, 100);
+		d.light = clampNum(m.d && m.d.light, 0, 100, 50);
 		d.name = String(m.d && m.d.name || "Nerd with No Name").substring(0, 50);
 		d.x = carPos[count].x;
 		d.y = carPos[count].y;
@@ -489,7 +493,7 @@ function joinLobby(c, fail){
 				document.getElementById("trackcode").innerHTML = m.m;
 				deleteMap();
 				eval(loadMap());
-				conn.send({t: "j", d: {color: color, name: name}});
+				conn.send({t: "j", d: {color: color, sat: sat, light: light, name: name}});
 			}else if(m.t == "y"){
 				done = true;
 				joined = true;
