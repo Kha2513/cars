@@ -648,8 +648,27 @@ input{
 }
 #faceedit{
 	display: flex;
+	align-items: center;
 	justify-content: space-between;
 	margin-top: 2.5vmin;
+}
+#facetabs{
+	display: flex;
+	justify-content: center;
+	margin-top: 1.5vmin;
+}
+#facetabs .cfgbtn{
+	height: 8vmin;
+	margin: 0 0.75vmin;
+	padding: 0 4vmin;
+	font-size: 4.5vmin;
+}
+#facehint{
+	min-height: 3.6vmin;
+	margin-top: 1.5vmin;
+	font-family: Arial, sans-serif;
+	font-size: 3vmin;
+	opacity: 0.8;
 }
 #facecanvas{
 	display: block;
@@ -662,7 +681,7 @@ input{
 	touch-action: none;
 }
 #facetools{
-	width: 36vmin;
+	width: 34vmin;
 	display: flex;
 	flex-direction: column;
 	justify-content: space-between;
