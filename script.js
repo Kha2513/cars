@@ -28,9 +28,6 @@ setTimeout(function(){
 	document.getElementsByClassName("menuitem")[1].style.transform = "none";
 }, 1200);
 setTimeout(function(){
-	document.getElementsByClassName("menuitem")[2].style.transform = "none";
-}, 1400);
-setTimeout(function(){
 	document.getElementById("mywebsitelink").style.transform = "none";
 }, 1600);
 setTimeout(function(){
@@ -84,6 +81,7 @@ var CFG_LIMITS = {laps: [1, 20, 1], speed: [10, 300, 10], time: [30, 600, 15]};
 var cfg = {mode: "race", laps: LAPS, speed: 100, time: 120};
 var brakeKey = false;
 var chatLog = [], unread = 0;
+var votes = {}, myVote = false, voteCount = {y: 0, n: 0}, roundTimers = [];
 var dashKey = false, dashTouch = false, dashEnergy = 1, dashLocked = false, dashFill;
 var carPos = [
 	{x: 0, y: 0},
@@ -122,12 +120,6 @@ function clampNum(v, lo, hi, def){
 
 var color = Math.floor(Math.random() * 360);
 var f = document.getElementById("fore");
-var huePicker = document.getElementById("colorpicker");
-var hueSlider = document.getElementById("slider");
-var satSlider = document.getElementById("satslider");
-var lightSlider = document.getElementById("lightslider");
-var satPicker = document.getElementById("satpicker");
-var lightPicker = document.getElementById("lightpicker");
 var nameBox = document.getElementById("name");
 
 function saveProfile(){
@@ -256,7 +248,11 @@ function faceToolsHtml(){
 }
 
 function faceTabsHtml(){
-	return "<div class='cfgbtn" + (padTarget == "face" ? " sel" : "") + "' data-act='tab' data-val='face'>Face</div><div class='cfgbtn" + (padTarget == "side" ? " sel" : "") + "' data-act='tab' data-val='side'>Sides</div>";
+	var names = [["color", "Color"], ["face", "Face"], ["side", "Sides"]];
+	var out = "";
+	for(var i = 0; i < names.length; i++)
+		out += "<div class='cfgbtn" + (padTarget == names[i][0] ? " sel" : "") + "' data-act='tab' data-val='" + names[i][0] + "'>" + names[i][1] + "</div>";
+	return out;
 }
 
 function renderFaceTools(){
@@ -266,9 +262,12 @@ function renderFaceTools(){
 	var tabs = document.getElementById("facetabs");
 	if(tabs)
 		tabs.innerHTML = faceTabsHtml();
+	var box = document.getElementById("facebox");
+	if(box)
+		box.setAttribute("data-tab", padTarget);
 	var hint = document.getElementById("facehint");
 	if(hint)
-		hint.textContent = padTarget == "side" ? "The front of the car is on the right. Both sides get this." : "This goes on the front of your car.";
+		hint.textContent = padTarget == "side" ? "The front of the car is on the right. Both sides get this." : padTarget == "face" ? "This goes on the front of your car." : "Drag the sliders to color your car.";
 }
 
 function setupFaceCanvas(){
@@ -352,8 +351,12 @@ function faceClick(e){
 	}else if(act == "erase"){
 		brush.erase = !brush.erase;
 	}else if(act == "tab"){
-		padTarget = t.getAttribute("data-val") == "side" ? "side" : "face";
-		setupFaceCanvas();
+		var tab = t.getAttribute("data-val");
+		padTarget = tab == "side" ? "side" : tab == "face" ? "face" : "color";
+		if(padTarget == "color")
+			updateColor();
+		else
+			setupFaceCanvas();
 	}else if(act == "clear"){
 		var canvas = document.getElementById("facecanvas");
 		canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
@@ -366,14 +369,15 @@ function faceClick(e){
 function openFaceEditor(){
 	if(document.getElementById("facepad"))
 		return;
-	padTarget = "face";
+	padTarget = "color";
 	var el = document.createElement("DIV");
 	el.id = "facepad";
-	el.innerHTML = "<div id='facebox' class='title'><div id='facetitle'>Draw your car</div><div id='facetabs'></div><div id='facehint'></div><div id='faceedit'><canvas id='facecanvas'></canvas><div id='facetools'></div></div></div>";
+	el.innerHTML = "<div id='facebox' class='title'><div id='facetitle'>Customize your car</div><div id='facetabs'></div><div id='facehint'></div><div id='faceedit'><canvas id='facecanvas'></canvas><div id='facetools'></div></div><div id='colortab'><div id='colorpicker' class='picker'><div id='slider' class='thumb'></div></div><div id='satpicker' class='picker'><div id='satslider' class='thumb'></div></div><div id='lightpicker' class='picker'><div id='lightslider' class='thumb'></div></div><div class='cfgbtn' id='colordone' data-act='done'>Done</div></div></div>";
 	el.addEventListener("click", faceClick);
 	f.appendChild(el);
 	renderFaceTools();
-	setupFaceCanvas();
+	bindColorPickers();
+	updateColor();
 	var canvas = document.getElementById("facecanvas");
 	canvas.addEventListener("pointerdown", function(e){
 		e.preventDefault();
@@ -450,27 +454,43 @@ function bindPicker(el, set){
 
 function updateColor(){
 	var car = "hsl(" + color + ", " + sat + "%, " + light + "%)";
-	hueSlider.style.marginLeft = color / 360 * 100 + "%";
-	hueSlider.style.backgroundColor = car;
-	satSlider.style.marginLeft = sat / 100 * 100 + "%";
-	satSlider.style.backgroundColor = car;
-	lightSlider.style.marginLeft = light / 100 * 100 + "%";
-	lightSlider.style.backgroundColor = car;
-	satPicker.style.background = "linear-gradient(90deg, hsl(" + color + ", 0%, " + light + "%), hsl(" + color + ", 100%, " + light + "%))";
-	lightPicker.style.background = "linear-gradient(90deg, hsl(" + color + ", " + sat + "%, 0%), hsl(" + color + ", " + sat + "%, 50%), hsl(" + color + ", " + sat + "%, 100%))";
+	var hs = document.getElementById("slider");
+	var ss = document.getElementById("satslider");
+	var ls = document.getElementById("lightslider");
+	var sp = document.getElementById("satpicker");
+	var lp = document.getElementById("lightpicker");
+	if(hs){
+		hs.style.marginLeft = color / 360 * 100 + "%";
+		hs.style.backgroundColor = car;
+	}
+	if(ss){
+		ss.style.marginLeft = sat + "%";
+		ss.style.backgroundColor = car;
+	}
+	if(ls){
+		ls.style.marginLeft = light + "%";
+		ls.style.backgroundColor = car;
+	}
+	if(sp)
+		sp.style.background = "linear-gradient(90deg, hsl(" + color + ", 0%, " + light + "%), hsl(" + color + ", 100%, " + light + "%))";
+	if(lp)
+		lp.style.background = "linear-gradient(90deg, hsl(" + color + ", " + sat + "%, 0%), hsl(" + color + ", " + sat + "%, 50%), hsl(" + color + ", " + sat + "%, 100%))";
 	document.body.style.backgroundColor = "hsl(" + color + ", 50%, 50%)";
 	updateFaceBtn();
 	saveProfile();
 }
-bindPicker(huePicker, function(v){
-	color = Math.floor(v * 360);
-});
-bindPicker(satPicker, function(v){
-	sat = Math.round(v * 100);
-});
-bindPicker(lightPicker, function(v){
-	light = Math.round(v * 100);
-});
+
+function bindColorPickers(){
+	bindPicker(document.getElementById("colorpicker"), function(v){
+		color = Math.floor(v * 360);
+	});
+	bindPicker(document.getElementById("satpicker"), function(v){
+		sat = Math.round(v * 100);
+	});
+	bindPicker(document.getElementById("lightpicker"), function(v){
+		light = Math.round(v * 100);
+	});
+}
 nameBox.addEventListener("input", saveProfile);
 loadProfile();
 updateColor();
@@ -612,6 +632,7 @@ function removePlayer(id){
 		labels.splice(i, 1);
 	delete players[id];
 	renderPlayers();
+	voteUpdate();
 }
 
 function leaveGame(){
@@ -765,18 +786,19 @@ function tagPlayer(id){
 function endTag(w){
 	gameOver = true;
 	var c = document.getElementById("countdown");
-	if(!c)
-		return;
-	c.style.fontSize = "10vmin";
-	c.style.lineHeight = "12vmin";
-	c.innerHTML = w == "it" ? "It wins!" : w == "runners" ? "Runners win!" : "Time!";
+	if(c){
+		c.style.fontSize = "10vmin";
+		c.style.lineHeight = "12vmin";
+		c.innerHTML = w == "it" ? "It wins!" : w == "runners" ? "Runners win!" : "Time!";
+	}
+	showEndMenu();
 }
 
 function finishTag(w){
 	if(gameOver)
 		return;
-	endTag(w);
 	broadcast({t: "end", w: w});
+	endTag(w);
 }
 
 function checkTags(){
@@ -968,6 +990,180 @@ function togglePanel(){
 		openPanel();
 }
 
+function showVotes(y, n){
+	voteCount = {y: y, n: n};
+	var b = document.getElementById("votebtn");
+	if(!b)
+		return;
+	b.textContent = "Play again" + (n ? " " + y + "/" + n : "");
+	b.className = myVote ? "cfgbtn sel" : "cfgbtn";
+}
+
+function voteUpdate(){
+	if(!net.isHost || !gameOver)
+		return;
+	var total = Object.keys(players).length;
+	var yes = 0;
+	for(var id in votes){
+		if(players[id] && votes[id])
+			yes++;
+	}
+	broadcast({t: "vc", y: yes, n: total});
+	showVotes(yes, total);
+	if(yes * 2 > total)
+		restartRound();
+}
+
+function toggleVote(){
+	if(!gameOver)
+		return;
+	myVote = !myVote;
+	if(net.isHost){
+		votes[me.id] = myVote;
+		voteUpdate();
+	}else if(net.hostConn && net.hostConn.open)
+		net.hostConn.send({t: "v", v: myVote ? 1 : 0});
+	showVotes(voteCount.y, voteCount.n);
+}
+
+function endClick(e){
+	var t = e.target;
+	var act = t.getAttribute ? t.getAttribute("data-act") : null;
+	var el = document.getElementById("endmenu");
+	if(act == "vote")
+		toggleVote();
+	else if(act == "leave")
+		leaveGame();
+	else if(act == "hide")
+		el.classList.add("min");
+	else if(act == "show")
+		el.classList.remove("min");
+}
+
+function closeEndMenu(){
+	var el = document.getElementById("endmenu");
+	if(el)
+		el.parentNode.removeChild(el);
+}
+
+function showEndMenu(){
+	if(document.getElementById("endmenu"))
+		return;
+	myVote = false;
+	var el = document.createElement("DIV");
+	el.id = "endmenu";
+	el.className = "title";
+	el.innerHTML = "<div id='endbuttons'><div class='cfgbtn' id='votebtn' data-act='vote'>Play again</div><div class='cfgbtn' data-act='leave'>Leave</div><div class='cfgbtn' data-act='hide'>Hide</div></div><div class='cfgbtn' id='endopen' data-act='show'>Menu</div>";
+	el.addEventListener("click", endClick);
+	f.appendChild(el);
+	showVotes(voteCount.y, voteCount.n);
+	if(net.isHost){
+		votes = {};
+		voteUpdate();
+	}
+}
+
+function endRace(n){
+	gameOver = true;
+	var c = document.getElementById("countdown");
+	if(c){
+		c.style.fontSize = "10vmin";
+		c.style.lineHeight = "12vmin";
+		c.textContent = String(n).substring(0, 50) + " Won!";
+	}
+	showEndMenu();
+}
+
+function finishRace(n){
+	if(gameOver)
+		return;
+	broadcast({t: "end", w: "race", n: n});
+	endRace(n);
+}
+
+function applyRestart(it, pos){
+	for(var id in players){
+		var pl = players[id];
+		var d = pl.data;
+		var p = pos && pos[id];
+		pl.it = false;
+		setOutline(pl, false);
+		if(p){
+			d.x = clampNum(p.x, -1000, 1000, 0);
+			d.y = clampNum(p.y, -1000, 1000, 0);
+		}
+		d.xv = 0;
+		d.yv = 0;
+		d.dir = 0;
+		d.steer = 0;
+		d.dash = 0;
+		d.brake = 0;
+		d.checkpoint = 1;
+		d.lap = 0;
+		pl.model.position.set(d.x, 0.6, d.y);
+		pl.model.rotation.y = 0;
+	}
+	if(pos && pos[me.id])
+		me.start = {x: clampNum(pos[me.id].x, -1000, 1000, 0), y: clampNum(pos[me.id].y, -1000, 1000, 0)};
+	dashEnergy = 1;
+	dashLocked = false;
+	snapCamera = true;
+	votes = {};
+	myVote = false;
+	voteCount = {y: 0, n: 0};
+	closeEndMenu();
+	startRound(it);
+}
+
+function restartRound(){
+	var ids = Object.keys(players);
+	var pos = {};
+	for(var i = 0; i < ids.length; i++)
+		pos[ids[i]] = {x: carPos[i].x, y: carPos[i].y};
+	var it = null;
+	runnersAtStart = 0;
+	if(gameMode == "tag"){
+		it = ids[Math.floor(Math.random() * ids.length)];
+		runnersAtStart = ids.length - 1;
+	}
+	broadcast({t: "rs", it: it, pos: pos});
+	applyRestart(it, pos);
+}
+
+function startRound(it){
+	for(var i = 0; i < roundTimers.length; i++)
+		clearTimeout(roundTimers[i]);
+	roundTimers = [];
+	gameOver = false;
+	gameSortaStarted = true;
+	var countDown = document.getElementById("countdown");
+	countDown.style.fontSize = "";
+	countDown.style.lineHeight = "";
+	countDown.innerHTML = "3";
+	lap.innerHTML = gameMode == "tag" ? fmtTime(tagTime) : "1/" + LAPS;
+	if(gameMode == "tag"){
+		tagEndsAt = Date.now() + 3000 + tagTime * 1000;
+		if(it && players[it]){
+			players[it].it = true;
+			setOutline(players[it], true);
+		}
+		showRole();
+	}
+	roundTimers.push(setTimeout(function(){
+		countDown.innerHTML = "2";
+	}, 1000));
+	roundTimers.push(setTimeout(function(){
+		countDown.innerHTML = "1";
+	}, 2000));
+	roundTimers.push(setTimeout(function(){
+		countDown.innerHTML = "GO!";
+		gameSortaStarted = false;
+	}, 3000));
+	roundTimers.push(setTimeout(function(){
+		countDown.innerHTML = "";
+	}, 4000));
+}
+
 function startRace(c, it){
 	if(gameStarted)
 		return;
@@ -1028,35 +1224,13 @@ function startRace(c, it){
 	f.appendChild(lap);
 
 	if(gameMode == "tag"){
-		lap.innerHTML = fmtTime(tagTime);
 		lap.className = "title timer";
 		roleEl = document.createElement("DIV");
 		roleEl.id = "role";
 		f.appendChild(roleEl);
-		tagEndsAt = Date.now() + 3000 + tagTime * 1000;
-		if(it && players[it]){
-			players[it].it = true;
-			setOutline(players[it], true);
-		}
-		showRole();
 	}
 
-	setTimeout(function(){
-		countDown.innerHTML = "2";
-	}, 1000);
-
-	setTimeout(function(){
-		countDown.innerHTML = "1";
-	}, 2000);
-
-	setTimeout(function(){
-		countDown.innerHTML = "GO!";
-		gameSortaStarted = false;
-	}, 3000);
-
-	setTimeout(function(){
-		countDown.innerHTML = "";
-	}, 4000);
+	startRound(it);
 }
 
 function hostMessage(conn, m){
@@ -1091,6 +1265,11 @@ function hostMessage(conn, m){
 		var text = String(m.text || "").trim().substring(0, 200);
 		if(players[id] && text)
 			hostChat(id, text);
+	}else if(m.t == "v"){
+		if(players[id] && gameOver){
+			votes[id] = !!m.v;
+			voteUpdate();
+		}
 	}else if(m.t == "u"){
 		if(!players[id] || !m.d || typeof m.d != "object")
 			return;
@@ -1211,7 +1390,14 @@ function joinLobby(c, fail){
 			}else if(m.t == "tag"){
 				tagPlayer(m.id);
 			}else if(m.t == "end"){
-				endTag(m.w);
+				if(m.w == "race")
+					endRace(m.n);
+				else
+					endTag(m.w);
+			}else if(m.t == "vc"){
+				showVotes(clampNum(m.y, 0, 99, 0), clampNum(m.n, 0, 99, 0));
+			}else if(m.t == "rs"){
+				applyRestart(m.it, m.pos);
 			}else if(m.t == "s"){
 				startRace(m.cfg, m.it);
 			}
@@ -1575,11 +1761,8 @@ function join(){
 							}
 						}
 
-						if(gameMode == "race" && play.data.lap > LAPS && document.getElementById("countdown").innerHTML == ""){
-							document.getElementById("countdown").style.fontSize = "10vmin";
-							document.getElementById("countdown").style.lineHeight = "12vmin";
-							document.getElementById("countdown").innerHTML = play.data.name.replaceAll("<", "&lt;") + " Won!";
-						}
+						if(net.isHost && gameMode == "race" && !gameOver && play.data.lap > LAPS && document.getElementById("countdown").innerHTML == "")
+							finishRace(play.data.name);
 
 						for(var pl in players){
 							if(play != players[pl] && play.model.position.distanceTo(players[pl].model.position) < 2){
