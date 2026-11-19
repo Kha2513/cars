@@ -660,8 +660,8 @@ input{
 #facetabs .cfgbtn{
 	height: 8vmin;
 	margin: 0 0.75vmin;
-	padding: 0 4vmin;
-	font-size: 4.5vmin;
+	padding: 0 2.5vmin;
+	font-size: 4vmin;
 }
 #facehint{
 	min-height: 3.6vmin;
@@ -876,4 +876,57 @@ input{
 	height: 8vmin;
 	margin-left: 1.5vmin;
 	font-size: 3.5vmin;
+}
+#facebox[data-tab=color] #faceedit{
+	display: none;
+}
+#facebox:not([data-tab=color]) #colortab{
+	display: none;
+}
+#colortab .picker{
+	width: 100%;
+}
+#colordone{
+	margin: 3vmin auto 0;
+	width: 30vmin;
+}
+#endmenu{
+	position: absolute;
+	left: 50%;
+	bottom: 3vmin;
+	transform: translateX(-50%);
+	z-index: 100004;
+}
+#endbuttons{
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	width: 56vmin;
+	padding: 2vmin;
+	color: white;
+	background-color: rgba(0, 0, 0, 0.75);
+	border: 1vmin solid white;
+	box-shadow: 0 2vmin 3vmin rgba(0, 0, 0, 0.5);
+}
+#endbuttons .cfgbtn{
+	width: 100%;
+	height: 9vmin;
+	margin: 0 0 1.5vmin;
+	padding: 0;
+	font-size: 4.5vmin;
+}
+#endbuttons .cfgbtn:last-child{
+	margin-bottom: 0;
+}
+#endopen{
+	display: none;
+	margin: 0;
+	padding: 0 3vmin;
+	color: white;
+}
+#endmenu.min #endbuttons{
+	display: none;
+}
+#endmenu.min #endopen{
+	display: flex;
 }
