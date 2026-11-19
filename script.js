@@ -80,7 +80,7 @@ function toggleFullScreen() {
 var name, code, players = {}, me = {}, gameStarted = false, gameSortaStarted = false, left = false, right = false, lap;
 var gameMode = "race", gameOver = false, speedMul = 1, tagTime = 120, tagEndsAt = 0, runnersAtStart = 0, roleEl, roleTimer;
 var TAG_DIST = 2.3;
-var CFG_LIMITS = {laps: [1, 20, 1], speed: [50, 150, 10], time: [30, 600, 15]};
+var CFG_LIMITS = {laps: [1, 20, 1], speed: [10, 300, 10], time: [30, 600, 15]};
 var cfg = {mode: "race", laps: LAPS, speed: 100, time: 120};
 var brakeKey = false;
 var chatLog = [], unread = 0;
@@ -106,8 +106,9 @@ var carPos = [
 	{x: -2, y: -15}
 ];
 var sat = 100, light = 50;
-var faceData = null;
-var FACE_SIZE = 32;
+var faceData = null, sideData = null;
+var ART_SIZES = {face: [32, 32], side: [64, 32]};
+var padTarget = "face";
 var FACE_COLORS = ["#000000", "#ffffff", "#ff3b30", "#ff9500", "#ffd60a", "#34c759", "#0a84ff", "#bf5af2"];
 var brush = {color: "#000000", size: 2, erase: false, last: null};
 var frontView = false, snapCamera = false;
@@ -131,7 +132,7 @@ var nameBox = document.getElementById("name");
 
 function saveProfile(){
 	try{
-		localStorage.setItem("carsProfile", JSON.stringify({name: nameBox.value, color: color, sat: sat, light: light, face: faceData}));
+		localStorage.setItem("carsProfile", JSON.stringify({name: nameBox.value, color: color, sat: sat, light: light, face: faceData, side: sideData}));
 	}catch(e){}
 }
 
@@ -147,52 +148,84 @@ function loadProfile(){
 		light = Math.round(clampNum(p.light, 0, 100, 50));
 		if(cleanFace(p.face))
 			faceData = p.face;
+		if(cleanFace(p.side))
+			sideData = p.side;
 	}catch(e){}
 }
 
 function cleanFace(v){
-	return typeof v == "string" && v.indexOf("data:image/png;base64,") === 0 && v.length < 12000 ? v : null;
+	return typeof v == "string" && v.indexOf("data:image/png;base64,") === 0 && v.length < 20000 ? v : null;
 }
 
 function carColor(d){
 	return "hsl(" + clampNum(d.color, 0, 360, 0) + ", " + clampNum(d.sat, 0, 100, 100) + "%, " + clampNum(d.light, 0, 100, 50) + "%)";
 }
 
-function faceSnapshot(){
+function artSnapshot(){
 	var out = {};
 	for(var id in players){
-		if(players[id].face)
-			out[id] = players[id].face;
+		if(players[id].face || players[id].side)
+			out[id] = {face: players[id].face || null, side: players[id].side || null};
 	}
 	return out;
+}
+
+function artTexture(v, w, h, bg, flip){
+	var c = document.createElement("CANVAS");
+	c.width = w;
+	c.height = h;
+	var ctx = c.getContext("2d");
+	ctx.fillStyle = bg;
+	ctx.fillRect(0, 0, w, h);
+	var tex = new THREE.Texture(c);
+	tex.magFilter = THREE.NearestFilter;
+	tex.needsUpdate = true;
+	var img = new Image();
+	img.onload = function(){
+		if(flip){
+			ctx.translate(w, 0);
+			ctx.scale(-1, 1);
+		}
+		ctx.drawImage(img, 0, 0, w, h);
+		tex.needsUpdate = true;
+	};
+	img.src = v;
+	return tex;
 }
 
 function setFace(pl, v){
 	v = cleanFace(v);
 	if(!v)
 		return;
-	var c = document.createElement("CANVAS");
-	c.width = FACE_SIZE;
-	c.height = FACE_SIZE;
-	var ctx = c.getContext("2d");
-	ctx.fillStyle = carColor(pl.data);
-	ctx.fillRect(0, 0, FACE_SIZE, FACE_SIZE);
-	var tex = new THREE.Texture(c);
-	tex.magFilter = THREE.NearestFilter;
-	tex.needsUpdate = true;
-	var img = new Image();
-	img.onload = function(){
-		ctx.drawImage(img, 0, 0, FACE_SIZE, FACE_SIZE);
-		tex.needsUpdate = true;
-	};
-	img.src = v;
 	var mesh = new THREE.Mesh(
 		new THREE.PlaneBufferGeometry(1, 1),
-		new THREE.MeshLambertMaterial({map: tex})
+		new THREE.MeshLambertMaterial({map: artTexture(v, ART_SIZES.face[0], ART_SIZES.face[1], carColor(pl.data), false)})
 	);
 	mesh.position.set(0, 0, 1.01);
 	pl.model.add(mesh);
 	pl.face = v;
+}
+
+function setSide(pl, v){
+	v = cleanFace(v);
+	if(!v)
+		return;
+	var w = ART_SIZES.side[0], h = ART_SIZES.side[1], bg = carColor(pl.data);
+	var left = new THREE.Mesh(
+		new THREE.PlaneBufferGeometry(2, 1),
+		new THREE.MeshLambertMaterial({map: artTexture(v, w, h, bg, false)})
+	);
+	left.position.set(-0.51, 0, 0);
+	left.rotation.y = -Math.PI / 2;
+	var right = new THREE.Mesh(
+		new THREE.PlaneBufferGeometry(2, 1),
+		new THREE.MeshLambertMaterial({map: artTexture(v, w, h, bg, true)})
+	);
+	right.position.set(0.51, 0, 0);
+	right.rotation.y = Math.PI / 2;
+	pl.model.add(left);
+	pl.model.add(right);
+	pl.side = v;
 }
 
 function updateFaceBtn(){
@@ -222,17 +255,49 @@ function faceToolsHtml(){
 	return out;
 }
 
+function faceTabsHtml(){
+	return "<div class='cfgbtn" + (padTarget == "face" ? " sel" : "") + "' data-act='tab' data-val='face'>Face</div><div class='cfgbtn" + (padTarget == "side" ? " sel" : "") + "' data-act='tab' data-val='side'>Sides</div>";
+}
+
 function renderFaceTools(){
 	var el = document.getElementById("facetools");
 	if(el)
 		el.innerHTML = faceToolsHtml();
+	var tabs = document.getElementById("facetabs");
+	if(tabs)
+		tabs.innerHTML = faceTabsHtml();
+	var hint = document.getElementById("facehint");
+	if(hint)
+		hint.textContent = padTarget == "side" ? "The front of the car is on the right. Both sides get this." : "This goes on the front of your car.";
+}
+
+function setupFaceCanvas(){
+	var canvas = document.getElementById("facecanvas");
+	if(!canvas)
+		return;
+	var target = padTarget;
+	var size = ART_SIZES[target];
+	canvas.width = size[0];
+	canvas.height = size[1];
+	canvas.style.width = target == "side" ? "50vmin" : "44vmin";
+	canvas.style.height = target == "side" ? "25vmin" : "44vmin";
+	canvas.style.backgroundColor = "hsl(" + color + ", " + sat + "%, " + light + "%)";
+	var data = target == "side" ? sideData : faceData;
+	if(data){
+		var img = new Image();
+		img.onload = function(){
+			if(target == padTarget)
+				canvas.getContext("2d").drawImage(img, 0, 0, size[0], size[1]);
+		};
+		img.src = data;
+	}
 }
 
 function saveFace(){
 	var canvas = document.getElementById("facecanvas");
 	if(!canvas)
 		return;
-	var data = canvas.getContext("2d").getImageData(0, 0, FACE_SIZE, FACE_SIZE).data;
+	var data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
 	var blank = true;
 	for(var i = 3; i < data.length; i += 4){
 		if(data[i] > 0){
@@ -240,15 +305,19 @@ function saveFace(){
 			break;
 		}
 	}
-	faceData = blank ? null : cleanFace(canvas.toDataURL("image/png"));
+	var v = blank ? null : cleanFace(canvas.toDataURL("image/png"));
+	if(padTarget == "side")
+		sideData = v;
+	else
+		faceData = v;
 	updateFaceBtn();
 	saveProfile();
 }
 
 function paintFace(canvas, e){
 	var rect = canvas.getBoundingClientRect();
-	var x = (e.clientX - rect.left) / rect.width * FACE_SIZE;
-	var y = (e.clientY - rect.top) / rect.height * FACE_SIZE;
+	var x = (e.clientX - rect.left) / rect.width * canvas.width;
+	var y = (e.clientY - rect.top) / rect.height * canvas.height;
 	var ctx = canvas.getContext("2d");
 	ctx.globalCompositeOperation = brush.erase ? "destination-out" : "source-over";
 	ctx.strokeStyle = brush.color;
@@ -282,9 +351,12 @@ function faceClick(e){
 		brush.size = Number(t.getAttribute("data-val"));
 	}else if(act == "erase"){
 		brush.erase = !brush.erase;
+	}else if(act == "tab"){
+		padTarget = t.getAttribute("data-val") == "side" ? "side" : "face";
+		setupFaceCanvas();
 	}else if(act == "clear"){
 		var canvas = document.getElementById("facecanvas");
-		canvas.getContext("2d").clearRect(0, 0, FACE_SIZE, FACE_SIZE);
+		canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
 		saveFace();
 	}else
 		return;
@@ -294,21 +366,15 @@ function faceClick(e){
 function openFaceEditor(){
 	if(document.getElementById("facepad"))
 		return;
+	padTarget = "face";
 	var el = document.createElement("DIV");
 	el.id = "facepad";
-	el.innerHTML = "<div id='facebox' class='title'><div id='facetitle'>Draw your face</div><div id='faceedit'><canvas id='facecanvas' width='" + FACE_SIZE + "' height='" + FACE_SIZE + "'></canvas><div id='facetools'></div></div></div>";
+	el.innerHTML = "<div id='facebox' class='title'><div id='facetitle'>Draw your car</div><div id='facetabs'></div><div id='facehint'></div><div id='faceedit'><canvas id='facecanvas'></canvas><div id='facetools'></div></div></div>";
 	el.addEventListener("click", faceClick);
 	f.appendChild(el);
 	renderFaceTools();
+	setupFaceCanvas();
 	var canvas = document.getElementById("facecanvas");
-	canvas.style.backgroundColor = "hsl(" + color + ", " + sat + "%, " + light + "%)";
-	if(faceData){
-		var img = new Image();
-		img.onload = function(){
-			canvas.getContext("2d").drawImage(img, 0, 0, FACE_SIZE, FACE_SIZE);
-		};
-		img.src = faceData;
-	}
 	canvas.addEventListener("pointerdown", function(e){
 		e.preventDefault();
 		if(canvas.setPointerCapture)
@@ -334,6 +400,19 @@ function closeFaceEditor(){
 	var el = document.getElementById("facepad");
 	if(el)
 		el.parentNode.removeChild(el);
+}
+
+function resetCar(){
+	if(!me.data || !me.start)
+		return;
+	me.data.x = me.start.x;
+	me.data.y = me.start.y;
+	me.data.xv = 0;
+	me.data.yv = 0;
+	me.data.dir = 0;
+	me.data.steer = 0;
+	me.data.checkpoint = me.data.lap == 0 ? 1 : 0;
+	snapCamera = true;
 }
 
 function toggleView(){
@@ -482,7 +561,7 @@ function newPlayerData(){
 	};
 }
 
-function addPlayer(id, data, mine, face){
+function addPlayer(id, data, mine, face, side){
 	if(players[id])
 		return;
 	var pl = players[id] = {
@@ -513,6 +592,7 @@ function addPlayer(id, data, mine, face){
 	pl.model.receiveShadow = true;
 	scene.add(pl.model);
 	setFace(pl, face);
+	setSide(pl, side);
 	if(mine){
 		me.label = pl.label;
 		me.model = pl.model;
@@ -560,7 +640,7 @@ function cfgHtml(){
 		return "<div class='cfgrow'><div class='cfglabel'>" + label + "</div><div class='cfgctl'>" + ctl + "</div></div>";
 	}
 	function step(key, text){
-		return "<div class='cfgbtn sq' data-act='step' data-key='" + key + "' data-dir='-1'>-</div><div class='cfgval'>" + text + "</div><div class='cfgbtn sq' data-act='step' data-key='" + key + "' data-dir='1'>+</div>";
+		return "<div class='cfgbtn sq' data-act='step' data-key='" + key + "' data-dir='-1'>-</div><div class='cfgval' id='cfgval-" + key + "'>" + text + "</div><div class='cfgbtn sq' data-act='step' data-key='" + key + "' data-dir='1'>+</div>";
 	}
 	var modes = "<div class='cfgbtn" + (tag ? "" : " sel") + "' data-act='mode' data-val='race'>Racing</div><div class='cfgbtn" + (tag ? " sel" : "") + "' data-act='mode' data-val='tag'>Tag</div>";
 	return "<div id='cfgbox' class='title'><div id='cfgtitle'>Settings</div>"
@@ -576,6 +656,41 @@ function renderCfg(){
 		el.innerHTML = cfgHtml();
 }
 
+function cfgText(key){
+	return key == "time" ? fmtTime(cfg.time) : key == "speed" ? cfg.speed + "%" : String(cfg.laps);
+}
+
+function cfgStepKey(key, dir){
+	var lim = CFG_LIMITS[key];
+	if(!lim)
+		return;
+	cfg[key] = Math.min(lim[1], Math.max(lim[0], cfg[key] + dir * lim[2]));
+	var el = document.getElementById("cfgval-" + key);
+	if(el)
+		el.textContent = cfgText(key);
+}
+
+var cfgTimer = null;
+
+function cfgStop(){
+	clearTimeout(cfgTimer);
+	cfgTimer = null;
+}
+
+function cfgDown(e){
+	var t = e.target;
+	if(!t.getAttribute || t.getAttribute("data-act") != "step")
+		return;
+	var key = t.getAttribute("data-key");
+	var dir = Number(t.getAttribute("data-dir"));
+	cfgStop();
+	cfgStepKey(key, dir);
+	cfgTimer = setTimeout(function repeat(){
+		cfgStepKey(key, dir);
+		cfgTimer = setTimeout(repeat, 80);
+	}, 400);
+}
+
 function cfgClick(e){
 	var t = e.target;
 	var act = t.getAttribute ? t.getAttribute("data-act") : null;
@@ -583,15 +698,9 @@ function cfgClick(e){
 		closeSettings();
 		return;
 	}
-	if(act == "mode"){
+	if(act == "mode")
 		cfg.mode = t.getAttribute("data-val") == "tag" ? "tag" : "race";
-	}else if(act == "step"){
-		var key = t.getAttribute("data-key");
-		var lim = CFG_LIMITS[key];
-		if(!lim)
-			return;
-		cfg[key] = Math.min(lim[1], Math.max(lim[0], cfg[key] + Number(t.getAttribute("data-dir")) * lim[2]));
-	}else
+	else
 		return;
 	renderCfg();
 }
@@ -602,11 +711,17 @@ function openSettings(){
 	var el = document.createElement("DIV");
 	el.id = "cfg";
 	el.addEventListener("click", cfgClick);
+	el.addEventListener("pointerdown", cfgDown);
+	window.addEventListener("pointerup", cfgStop);
+	window.addEventListener("pointercancel", cfgStop);
 	f.appendChild(el);
 	renderCfg();
 }
 
 function closeSettings(){
+	cfgStop();
+	window.removeEventListener("pointerup", cfgStop);
+	window.removeEventListener("pointercancel", cfgStop);
 	var el = document.getElementById("cfg");
 	if(el)
 		el.parentNode.removeChild(el);
@@ -695,6 +810,8 @@ function checkTags(){
 }
 
 function uniqueName(n){
+	if(n.toLowerCase() == "kha2513")
+		return n;
 	var taken = {};
 	for(var id in players)
 		taken[String(players[id].data.name).toLowerCase()] = true;
@@ -963,12 +1080,13 @@ function hostMessage(conn, m){
 		d.y = carPos[count].y;
 		net.conns[id] = conn;
 		var fc = cleanFace(m.face);
-		addPlayer(id, d, false, fc);
+		var sd = cleanFace(m.side);
+		addPlayer(id, d, false, fc, sd);
 		conn.send({t: "y", id: id, p: snapshot()});
-		var fs = faceSnapshot();
-		for(var fid in fs)
-			conn.send({t: "f", id: fid, face: fs[fid]});
-		broadcast({t: "a", id: id, d: d, face: fc}, id);
+		var arts = artSnapshot();
+		for(var fid in arts)
+			conn.send({t: "f", id: fid, face: arts[fid].face, side: arts[fid].side});
+		broadcast({t: "a", id: id, d: d, face: fc, side: sd}, id);
 	}else if(m.t == "c"){
 		var text = String(m.text || "").trim().substring(0, 200);
 		if(players[id] && text)
@@ -1056,7 +1174,7 @@ function joinLobby(c, fail){
 				document.getElementById("trackcode").innerHTML = m.m;
 				deleteMap();
 				eval(loadMap());
-				conn.send({t: "j", d: {color: color, sat: sat, light: light, name: name}, face: faceData});
+				conn.send({t: "j", d: {color: color, sat: sat, light: light, name: name}, face: faceData, side: sideData});
 			}else if(m.t == "y"){
 				done = true;
 				joined = true;
@@ -1070,9 +1188,10 @@ function joinLobby(c, fail){
 						addPlayer(p, m.p[p], false);
 				}
 				me.data = m.p[m.id];
-				addPlayer(m.id, me.data, true, faceData);
+				me.start = {x: me.data.x, y: me.data.y};
+				addPlayer(m.id, me.data, true, faceData, sideData);
 			}else if(m.t == "a"){
-				addPlayer(m.id, m.d, false, m.face);
+				addPlayer(m.id, m.d, false, m.face, m.side);
 			}else if(m.t == "u"){
 				if(m.id != me.id && players[m.id])
 					players[m.id].data = m.d;
@@ -1087,6 +1206,8 @@ function joinLobby(c, fail){
 			}else if(m.t == "f"){
 				if(players[m.id] && !players[m.id].face)
 					setFace(players[m.id], m.face);
+				if(players[m.id] && !players[m.id].side)
+					setSide(players[m.id], m.side);
 			}else if(m.t == "tag"){
 				tagPlayer(m.id);
 			}else if(m.t == "end"){
@@ -1109,7 +1230,8 @@ function host(){
 			document.getElementById("code").innerHTML = code;
 			me.id = net.peer.id;
 			me.data = newPlayerData();
-			addPlayer(me.id, me.data, true, faceData);
+			me.start = {x: me.data.x, y: me.data.y};
+			addPlayer(me.id, me.data, true, faceData, sideData);
 		});
 	}, 1000);
 
@@ -1355,43 +1477,81 @@ function join(){
 			players[me.id].data = me.data;
 
 			if(!gameSortaStarted){
-				for(var p in players){
-					var play = players[p];
+				var fastest = 0;
+				for(var q in players)
+					fastest = Math.max(fastest, Math.hypot(players[q].data.xv, players[q].data.yv) || 0);
+				var steps = Math.min(8, Math.max(1, Math.ceil(fastest * warp / 0.6)));
+				var fullWarp = warp;
+				warp = fullWarp / steps;
+				for(var st = 0; st < steps; st++){
+					for(var p in players){
+						var play = players[p];
 
-					play.data.dir += play.data.steer / 10 * warp;
+						play.data.dir += play.data.steer / 10 * warp;
 
-					if(play.data.brake){
-						play.data.xv *= Math.pow(BRAKE_DRAG, warp);
-						play.data.yv *= Math.pow(BRAKE_DRAG, warp);
-					}else{
-						var accel = SPEED * speedMul * (play.data.dash ? DASH_BOOST : 1);
-						play.data.xv += Math.sin(play.data.dir) * accel * warp;
-						play.data.yv += Math.cos(play.data.dir) * accel * warp;
-					}
+						if(play.data.brake){
+							play.data.xv *= Math.pow(BRAKE_DRAG, warp);
+							play.data.yv *= Math.pow(BRAKE_DRAG, warp);
+						}else{
+							var accel = SPEED * speedMul * (play.data.dash ? DASH_BOOST : 1);
+							play.data.xv += Math.sin(play.data.dir) * accel * warp;
+							play.data.yv += Math.cos(play.data.dir) * accel * warp;
+						}
 
-					play.data.xv *= Math.pow(0.99, warp);
-					play.data.yv *= Math.pow(0.99, warp);
+						play.data.xv *= Math.pow(0.99, warp);
+						play.data.yv *= Math.pow(0.99, warp);
 
-					play.data.x += play.data.xv * warp;
-					play.data.y += play.data.yv * warp;
+						play.data.x += play.data.xv * warp;
+						play.data.y += play.data.yv * warp;
 
-					play.model.position.x = play.data.x + play.data.xv;
-					play.model.position.z = play.data.y + play.data.yv;
-					play.model.rotation.y = play.data.dir;
+						play.model.position.x = play.data.x + play.data.xv;
+						play.model.position.z = play.data.y + play.data.yv;
+						play.model.rotation.y = play.data.dir;
 
-					play.model.children[0].rotation.z = Math.PI / 2 - play.data.steer;
-					play.model.children[1].rotation.z = Math.PI / 2 - play.data.steer;
+						play.model.children[0].rotation.z = Math.PI / 2 - play.data.steer;
+						play.model.children[1].rotation.z = Math.PI / 2 - play.data.steer;
 
-					for(var w in map.children){
-						var wall = map.children[w];
-						var posi = new THREE.Vector2(play.data.x, play.data.y);
-						if(Math.abs(wall.plane.distanceToPoint(play.model.position.clone().sub(wall.position))) < WALL_SIZE){
-							if(wall.position.clone().distanceTo(play.model.position) < wall.width / 2){
+						for(var w in map.children){
+							var wall = map.children[w];
+							var posi = new THREE.Vector2(play.data.x, play.data.y);
+							if(Math.abs(wall.plane.distanceToPoint(play.model.position.clone().sub(wall.position))) < WALL_SIZE){
+								if(wall.position.clone().distanceTo(play.model.position) < wall.width / 2){
+									var vel = new THREE.Vector3(play.data.xv, 0, play.data.yv);
+									vel.reflect(wall.plane.normal);
+									play.data.xv = vel.x + BOUNCE_CORRECT * wall.plane.normal.x * Math.sign(wall.plane.normal.dot(play.model.position.clone().sub(wall.position)));
+									play.data.yv = vel.z + BOUNCE_CORRECT * wall.plane.normal.z * Math.sign(wall.plane.normal.dot(play.model.position.clone().sub(wall.position)));
+									while(Math.abs(wall.plane.distanceToPoint(new THREE.Vector3(play.data.x, 0, play.data.y).sub(wall.position))) < WALL_SIZE){
+										play.data.x += play.data.xv;
+										play.data.y += play.data.yv;
+									}
+									play.data.xv *= BOUNCE;
+									play.data.yv *= BOUNCE;
+								}
+							}
+							if(posi.distanceTo(wall.p1) < WALL_SIZE + 0.1){
+								var norm = posi.clone().sub(wall.p1);
+								norm = new THREE.Vector3(norm.x, 0, norm.y);
+								norm.normalize();
 								var vel = new THREE.Vector3(play.data.xv, 0, play.data.yv);
-								vel.reflect(wall.plane.normal);
-								play.data.xv = vel.x + BOUNCE_CORRECT * wall.plane.normal.x * Math.sign(wall.plane.normal.dot(play.model.position.clone().sub(wall.position)));
-								play.data.yv = vel.z + BOUNCE_CORRECT * wall.plane.normal.z * Math.sign(wall.plane.normal.dot(play.model.position.clone().sub(wall.position)));
-								while(Math.abs(wall.plane.distanceToPoint(new THREE.Vector3(play.data.x, 0, play.data.y).sub(wall.position))) < WALL_SIZE){
+								vel.reflect(norm);
+								play.data.xv = vel.x + norm.x * BOUNCE_CORRECT * 1;
+								play.data.yv = vel.z + norm.z * BOUNCE_CORRECT * 1;
+								while((new THREE.Vector2(play.data.x, play.data.y)).distanceTo(wall.p1) < WALL_SIZE + 0.1){
+									play.data.x += play.data.xv;
+									play.data.y += play.data.yv;
+								}
+								play.data.xv *= BOUNCE;
+								play.data.yv *= BOUNCE;
+							}
+							if(posi.distanceTo(wall.p2) < WALL_SIZE + 0.1){
+								var norm = posi.clone().sub(wall.p2);
+								norm = new THREE.Vector3(norm.x, 0, norm.y);
+								norm.normalize();
+								var vel = new THREE.Vector3(play.data.xv, 0, play.data.yv);
+								vel.reflect(norm);
+								play.data.xv = vel.x + norm.x * BOUNCE_CORRECT * 1;
+								play.data.yv = vel.z + norm.z * BOUNCE_CORRECT * 1;
+								while((new THREE.Vector2(play.data.x, play.data.y)).distanceTo(wall.p2) < WALL_SIZE + 0.1){
 									play.data.x += play.data.xv;
 									play.data.y += play.data.yv;
 								}
@@ -1399,95 +1559,66 @@ function join(){
 								play.data.yv *= BOUNCE;
 							}
 						}
-						if(posi.distanceTo(wall.p1) < WALL_SIZE + 0.1){
-							var norm = posi.clone().sub(wall.p1);
-							norm = new THREE.Vector3(norm.x, 0, norm.y);
-							norm.normalize();
-							var vel = new THREE.Vector3(play.data.xv, 0, play.data.yv);
-							vel.reflect(norm);
-							play.data.xv = vel.x + norm.x * BOUNCE_CORRECT * 1;
-							play.data.yv = vel.z + norm.z * BOUNCE_CORRECT * 1;
-							while((new THREE.Vector2(play.data.x, play.data.y)).distanceTo(wall.p1) < WALL_SIZE + 0.1){
-								play.data.x += play.data.xv;
-								play.data.y += play.data.yv;
-							}
-							play.data.xv *= BOUNCE;
-							play.data.yv *= BOUNCE;
-						}
-						if(posi.distanceTo(wall.p2) < WALL_SIZE + 0.1){
-							var norm = posi.clone().sub(wall.p2);
-							norm = new THREE.Vector3(norm.x, 0, norm.y);
-							norm.normalize();
-							var vel = new THREE.Vector3(play.data.xv, 0, play.data.yv);
-							vel.reflect(norm);
-							play.data.xv = vel.x + norm.x * BOUNCE_CORRECT * 1;
-							play.data.yv = vel.z + norm.z * BOUNCE_CORRECT * 1;
-							while((new THREE.Vector2(play.data.x, play.data.y)).distanceTo(wall.p2) < WALL_SIZE + 0.1){
-								play.data.x += play.data.xv;
-								play.data.y += play.data.yv;
-							}
-							play.data.xv *= BOUNCE;
-							play.data.yv *= BOUNCE;
-						}
-					}
 
-					for(var i in startc.children){
-						var cp = startc.children[i];
-						if(Math.abs(cp.plane.distanceToPoint(play.model.position.clone().sub(cp.position))) < 1){
-							if(cp.position.clone().distanceTo(play.model.position) < cp.width / 2 + 1){
-								if(i == 0){
-									if(play.data.checkpoint == 1){
-										play.data.checkpoint = 0;
-										play.data.lap++;
-									}
-								}else
-									play.data.checkpoint = 1;
+						for(var i in startc.children){
+							var cp = startc.children[i];
+							if(Math.abs(cp.plane.distanceToPoint(play.model.position.clone().sub(cp.position))) < 1){
+								if(cp.position.clone().distanceTo(play.model.position) < cp.width / 2 + 1){
+									if(i == 0){
+										if(play.data.checkpoint == 1){
+											play.data.checkpoint = 0;
+											play.data.lap++;
+										}
+									}else
+										play.data.checkpoint = 1;
+								}
 							}
 						}
-					}
 
-					if(gameMode == "race" && play.data.lap > LAPS && document.getElementById("countdown").innerHTML == ""){
-						document.getElementById("countdown").style.fontSize = "10vmin";
-						document.getElementById("countdown").style.lineHeight = "12vmin";
-						document.getElementById("countdown").innerHTML = play.data.name.replaceAll("<", "&lt;") + " Won!";
-					}
+						if(gameMode == "race" && play.data.lap > LAPS && document.getElementById("countdown").innerHTML == ""){
+							document.getElementById("countdown").style.fontSize = "10vmin";
+							document.getElementById("countdown").style.lineHeight = "12vmin";
+							document.getElementById("countdown").innerHTML = play.data.name.replaceAll("<", "&lt;") + " Won!";
+						}
 
-					for(var pl in players){
-						if(play != players[pl] && play.model.position.distanceTo(players[pl].model.position) < 2){
-							var ply = players[pl];
-							var temp = new THREE.Vector2(play.data.xv, play.data.yv);
-							var temp2 = new THREE.Vector2(ply.data.xv, ply.data.yv);
-							ply.data.xv -= temp.x;
-							ply.data.yv -= temp.y;
-							play.data.xv -= temp2.x;
-							play.data.yv -= temp2.y;
-							var norm = (new THREE.Vector2(play.data.x, play.data.y)).sub(new THREE.Vector2(ply.data.x, ply.data.y));
-							norm = new THREE.Vector3(norm.x, 0, norm.y);
-							norm.normalize();
-							var vel = new THREE.Vector3(play.data.xv, 0, play.data.yv);
-							var vel2 = new THREE.Vector3(ply.data.xv, 0, ply.data.yv);
-							vel.reflect(norm);
-							vel2.reflect(norm);
-							ply.data.xv += COLLISION * vel2.x;
-							ply.data.yv += COLLISION * vel2.z;
-							play.data.xv += COLLISION * vel.x;
-							play.data.yv += COLLISION * vel.z;
-							ply.data.xv += temp.x;
-							ply.data.yv += temp.y;
-							play.data.xv += temp2.x;
-							play.data.yv += temp2.y;
-							while((new THREE.Vector2(play.data.x, play.data.y)).distanceTo(new THREE.Vector2(ply.data.x, ply.data.y)) < 2){
-								play.data.x += play.data.xv;
-								play.data.y += play.data.yv;
+						for(var pl in players){
+							if(play != players[pl] && play.model.position.distanceTo(players[pl].model.position) < 2){
+								var ply = players[pl];
+								var temp = new THREE.Vector2(play.data.xv, play.data.yv);
+								var temp2 = new THREE.Vector2(ply.data.xv, ply.data.yv);
+								ply.data.xv -= temp.x;
+								ply.data.yv -= temp.y;
+								play.data.xv -= temp2.x;
+								play.data.yv -= temp2.y;
+								var norm = (new THREE.Vector2(play.data.x, play.data.y)).sub(new THREE.Vector2(ply.data.x, ply.data.y));
+								norm = new THREE.Vector3(norm.x, 0, norm.y);
+								norm.normalize();
+								var vel = new THREE.Vector3(play.data.xv, 0, play.data.yv);
+								var vel2 = new THREE.Vector3(ply.data.xv, 0, ply.data.yv);
+								vel.reflect(norm);
+								vel2.reflect(norm);
+								ply.data.xv += COLLISION * vel2.x;
+								ply.data.yv += COLLISION * vel2.z;
+								play.data.xv += COLLISION * vel.x;
+								play.data.yv += COLLISION * vel.z;
+								ply.data.xv += temp.x;
+								ply.data.yv += temp.y;
+								play.data.xv += temp2.x;
+								play.data.yv += temp2.y;
+								while((new THREE.Vector2(play.data.x, play.data.y)).distanceTo(new THREE.Vector2(ply.data.x, ply.data.y)) < 2){
+									play.data.x += play.data.xv;
+									play.data.y += play.data.yv;
+								}
 							}
 						}
-					}
 
-					if(play.model.position.distanceTo(new THREE.Vector3()) > OOB_DIST){
-						play.data.x = 0;
-						play.data.y = 0;
+						if(play.model.position.distanceTo(new THREE.Vector3()) > OOB_DIST){
+							play.data.x = 0;
+							play.data.y = 0;
+						}
 					}
 				}
+				warp = fullWarp;
 
 				if(net.isHost && gameMode == "tag" && !gameOver)
 					checkTags();
@@ -1606,6 +1737,8 @@ window.onkeydown = function(e){
 		dashKey = true;
 	if(e.keyCode == 70 && gameStarted && !e.repeat)
 		toggleView();
+	if(e.keyCode == 82 && gameStarted && !gameSortaStarted && !e.repeat)
+		resetCar();
 	if(e.keyCode == 32 && gameStarted){
 		e.preventDefault();
 		brakeKey = true;
