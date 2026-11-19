@@ -13,6 +13,7 @@ var DASH_FOV = 110;
 var DASH_BOOST = 2;
 var DASH_DRAIN = 0.012;
 var DASH_REGEN = 0.004;
+var BRAKE_DRAG = 0.93;
 function MODS(){
 
 }
@@ -81,6 +82,8 @@ var gameMode = "race", gameOver = false, speedMul = 1, tagTime = 120, tagEndsAt 
 var TAG_DIST = 2.3;
 var CFG_LIMITS = {laps: [1, 20, 1], speed: [50, 150, 10], time: [30, 600, 15]};
 var cfg = {mode: "race", laps: LAPS, speed: 100, time: 120};
+var brakeKey = false;
+var chatLog = [], unread = 0;
 var dashKey = false, dashTouch = false, dashEnergy = 1, dashLocked = false, dashFill;
 var carPos = [
 	{x: 0, y: 0},
@@ -468,6 +471,7 @@ function newPlayerData(){
 		dir: 0,
 		steer: 0,
 		dash: 0,
+		brake: 0,
 		color: color,
 		sat: sat,
 		light: light,
@@ -527,6 +531,7 @@ function removePlayer(id){
 	if(i >= 0)
 		labels.splice(i, 1);
 	delete players[id];
+	renderPlayers();
 }
 
 function leaveGame(){
@@ -647,7 +652,8 @@ function endTag(w){
 	var c = document.getElementById("countdown");
 	if(!c)
 		return;
-	c.style.fontSize = "18vmin";
+	c.style.fontSize = "10vmin";
+	c.style.lineHeight = "12vmin";
 	c.innerHTML = w == "it" ? "It wins!" : w == "runners" ? "Runners win!" : "Time!";
 }
 
@@ -688,6 +694,163 @@ function checkTags(){
 		finishTag(runners > 0 ? "runners" : "time");
 }
 
+function uniqueName(n){
+	var taken = {};
+	for(var id in players)
+		taken[String(players[id].data.name).toLowerCase()] = true;
+	if(!taken[n.toLowerCase()])
+		return n;
+	var i = 2;
+	while(taken[(n.substring(0, 46) + " " + i).toLowerCase()])
+		i++;
+	return n.substring(0, 46) + " " + i;
+}
+
+function updateBadge(){
+	var b = document.getElementById("badge");
+	if(!b)
+		return;
+	b.className = unread > 0 ? "badge show" : "badge";
+	b.textContent = unread > 99 ? "99+" : unread;
+}
+
+function renderPlayers(){
+	var list = document.getElementById("playerlist");
+	if(!list)
+		return;
+	list.innerHTML = "";
+	for(var id in players){
+		var row = document.createElement("DIV");
+		row.className = "prow";
+		var nm = document.createElement("SPAN");
+		nm.textContent = players[id].data.name + (id == me.id ? " (you)" : "");
+		row.appendChild(nm);
+		if(id != me.id){
+			var kick = document.createElement("DIV");
+			kick.className = "cfgbtn kick";
+			kick.textContent = "Kick";
+			kick.setAttribute("data-act", "kick");
+			kick.setAttribute("data-id", id);
+			row.appendChild(kick);
+		}
+		list.appendChild(row);
+	}
+}
+
+function chatLineEl(m){
+	var line = document.createElement("DIV");
+	line.className = m.sys ? "chatline sys" : "chatline";
+	if(!m.sys){
+		var b = document.createElement("B");
+		b.textContent = m.name + ": ";
+		line.appendChild(b);
+	}
+	line.appendChild(document.createTextNode(m.text));
+	return line;
+}
+
+function addChatLine(m){
+	m = {name: String(m.name || "").substring(0, 50), text: String(m.text || "").substring(0, 200), sys: !!m.sys};
+	chatLog.push(m);
+	if(chatLog.length > 100)
+		chatLog.shift();
+	var log = document.getElementById("chatlog");
+	if(log){
+		log.appendChild(chatLineEl(m));
+		log.scrollTop = log.scrollHeight;
+	}else{
+		unread++;
+		updateBadge();
+	}
+}
+
+function hostChat(id, text){
+	var pl = players[id];
+	if(!pl)
+		return;
+	var m = {t: "c", name: pl.data.name, text: text};
+	broadcast(m);
+	addChatLine(m);
+}
+
+function sendChat(){
+	var input = document.getElementById("chatinput");
+	if(!input)
+		return;
+	var text = input.value.trim().substring(0, 200);
+	input.value = "";
+	if(!text)
+		return;
+	if(net.isHost)
+		hostChat(me.id, text);
+	else if(net.hostConn && net.hostConn.open)
+		net.hostConn.send({t: "c", text: text});
+}
+
+function kickPlayer(id){
+	if(!net.isHost || id == me.id)
+		return;
+	var conn = net.conns[id];
+	var pl = players[id];
+	if(!conn || !pl)
+		return;
+	var nm = pl.data.name;
+	delete net.conns[id];
+	conn.send({t: "kick"});
+	setTimeout(function(){
+		conn.close();
+	}, 300);
+	removePlayer(id);
+	broadcast({t: "r", id: id});
+	var m = {t: "c", sys: true, name: "", text: nm + " was kicked"};
+	broadcast(m);
+	addChatLine(m);
+}
+
+function panelClick(e){
+	var t = e.target;
+	var act = t.getAttribute ? t.getAttribute("data-act") : null;
+	if(act == "kick")
+		kickPlayer(t.getAttribute("data-id"));
+	else if(act == "send")
+		sendChat();
+}
+
+function closePanel(){
+	var el = document.getElementById("panel");
+	if(el)
+		el.parentNode.removeChild(el);
+}
+
+function openPanel(){
+	if(document.getElementById("panel"))
+		return;
+	unread = 0;
+	updateBadge();
+	var el = document.createElement("DIV");
+	el.id = "panel";
+	el.className = "title";
+	el.innerHTML = "<div id='paneltitle'>" + (net.isHost ? "Players" : "Chat") + "</div>" + (net.isHost ? "<div id='playerlist'></div>" : "") + "<div id='chatlog'></div><div id='chatrow'><input id='chatinput' maxlength='200' placeholder='Say something'><div id='chatsend' class='cfgbtn' data-act='send'>Send</div></div>";
+	el.addEventListener("click", panelClick);
+	f.appendChild(el);
+	renderPlayers();
+	var log = document.getElementById("chatlog");
+	for(var i = 0; i < chatLog.length; i++)
+		log.appendChild(chatLineEl(chatLog[i]));
+	log.scrollTop = log.scrollHeight;
+	document.getElementById("chatinput").addEventListener("keydown", function(e){
+		if(e.keyCode == 13)
+			sendChat();
+	});
+}
+
+function togglePanel(){
+	if(document.getElementById("panel"))
+		closePanel();
+	else
+		openPanel();
+}
+
 function startRace(c, it){
 	if(gameStarted)
 		return;
@@ -720,6 +883,12 @@ function startRace(c, it){
 	bar.className = "title";
 	bar.innerHTML = "<div id='dashlabel'>Dash</div><div id='dashbar'><div id='dashfill'></div></div><div id='viewbtn' onclick='toggleView()'><svg viewBox='0 0 24 24'><circle cx='12' cy='12' r='9.5' fill='none' stroke='currentColor' stroke-width='2'/><circle cx='8.5' cy='10' r='1.5' fill='currentColor'/><circle cx='15.5' cy='10' r='1.5' fill='currentColor'/><path d='M7.5 14.5q4.5 4 9 0' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'/></svg></div><div id='leave' ontouchstart='this.click()' onclick='leaveGame()'>Leave</div>";
 	f.appendChild(bar);
+	var pb = document.createElement("DIV");
+	pb.id = "panelbtn";
+	pb.className = net.isHost ? "host" : "chat";
+	pb.innerHTML = (net.isHost ? "" : "<svg viewBox='0 0 24 24'><path d='M4 5h16v11H9l-5 4z' fill='none' stroke='currentColor' stroke-width='2' stroke-linejoin='round'/></svg>") + "<div class='badge' id='badge'></div>";
+	pb.addEventListener("click", togglePanel);
+	f.appendChild(pb);
 	dashFill = document.getElementById("dashfill");
 	var dashBar = document.getElementById("dashbar");
 	function dashOn(e){
@@ -789,7 +958,7 @@ function hostMessage(conn, m){
 		d.color = clampNum(m.d && m.d.color, 0, 360, 0);
 		d.sat = clampNum(m.d && m.d.sat, 0, 100, 100);
 		d.light = clampNum(m.d && m.d.light, 0, 100, 50);
-		d.name = String(m.d && m.d.name || "Nerd with No Name").substring(0, 50);
+		d.name = uniqueName(String(m.d && m.d.name || "").trim().substring(0, 50) || "Nerd with No Name");
 		d.x = carPos[count].x;
 		d.y = carPos[count].y;
 		net.conns[id] = conn;
@@ -800,6 +969,10 @@ function hostMessage(conn, m){
 		for(var fid in fs)
 			conn.send({t: "f", id: fid, face: fs[fid]});
 		broadcast({t: "a", id: id, d: d, face: fc}, id);
+	}else if(m.t == "c"){
+		var text = String(m.text || "").trim().substring(0, 200);
+		if(players[id] && text)
+			hostChat(id, text);
 	}else if(m.t == "u"){
 		if(!players[id] || !m.d || typeof m.d != "object")
 			return;
@@ -906,6 +1079,11 @@ function joinLobby(c, fail){
 			}else if(m.t == "r"){
 				if(m.id != me.id)
 					removePlayer(m.id);
+			}else if(m.t == "c"){
+				addChatLine(m);
+			}else if(m.t == "kick"){
+				alert("You were kicked by the host");
+				location.reload();
 			}else if(m.t == "f"){
 				if(players[m.id] && !players[m.id].face)
 					setFace(players[m.id], m.face);
@@ -1164,7 +1342,8 @@ function join(){
 			var wantDash = (dashKey || dashTouch) && !gameSortaStarted;
 			if(dashLocked && dashEnergy >= 0.25)
 				dashLocked = false;
-			me.data.dash = wantDash && !dashLocked && dashEnergy > 0 ? 1 : 0;
+			me.data.brake = brakeKey && !gameSortaStarted ? 1 : 0;
+			me.data.dash = wantDash && !dashLocked && dashEnergy > 0 && !me.data.brake ? 1 : 0;
 			if(me.data.dash){
 				dashEnergy = Math.max(0, dashEnergy - DASH_DRAIN * warp);
 				if(dashEnergy == 0)
@@ -1181,9 +1360,14 @@ function join(){
 
 					play.data.dir += play.data.steer / 10 * warp;
 
-					var accel = SPEED * speedMul * (play.data.dash ? DASH_BOOST : 1);
-					play.data.xv += Math.sin(play.data.dir) * accel * warp;
-					play.data.yv += Math.cos(play.data.dir) * accel * warp;
+					if(play.data.brake){
+						play.data.xv *= Math.pow(BRAKE_DRAG, warp);
+						play.data.yv *= Math.pow(BRAKE_DRAG, warp);
+					}else{
+						var accel = SPEED * speedMul * (play.data.dash ? DASH_BOOST : 1);
+						play.data.xv += Math.sin(play.data.dir) * accel * warp;
+						play.data.yv += Math.cos(play.data.dir) * accel * warp;
+					}
 
 					play.data.xv *= Math.pow(0.99, warp);
 					play.data.yv *= Math.pow(0.99, warp);
@@ -1263,7 +1447,8 @@ function join(){
 					}
 
 					if(gameMode == "race" && play.data.lap > LAPS && document.getElementById("countdown").innerHTML == ""){
-						document.getElementById("countdown").style.fontSize = "25vmin";
+						document.getElementById("countdown").style.fontSize = "10vmin";
+						document.getElementById("countdown").style.lineHeight = "12vmin";
 						document.getElementById("countdown").innerHTML = play.data.name.replaceAll("<", "&lt;") + " Won!";
 					}
 
@@ -1411,6 +1596,8 @@ function startGame(){
 }
 
 window.onkeydown = function(e){
+	if(e.target && e.target.tagName == "INPUT")
+		return;
 	if(e.keyCode == 37)
 		left = true;
 	if(e.keyCode == 39)
@@ -1419,6 +1606,10 @@ window.onkeydown = function(e){
 		dashKey = true;
 	if(e.keyCode == 70 && gameStarted && !e.repeat)
 		toggleView();
+	if(e.keyCode == 32 && gameStarted){
+		e.preventDefault();
+		brakeKey = true;
+	}
 }
 
 window.onkeyup = function(e){
@@ -1428,6 +1619,8 @@ window.onkeyup = function(e){
 		right = false;
 	if(e.keyCode == 69)
 		dashKey = false;
+	if(e.keyCode == 32)
+		brakeKey = false;
 }
 
 document.body.onkeydown = function(e){
