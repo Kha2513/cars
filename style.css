@@ -725,3 +725,136 @@ input{
 	box-shadow: 0 0.25vmin 0.5vmin rgba(0, 0, 0, 0.5);
 	transform: scale(0.9);
 }
+#panelbtn{
+	position: absolute;
+	right: 2vmin;
+	bottom: 2vmin;
+	width: 14vmin;
+	height: 14vmin;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: white;
+	background-color: #6eb0ea;
+	cursor: pointer;
+	box-shadow: 0 2vmin 3vmin rgba(0, 0, 0, 0.5);
+	transition: transform .2s, box-shadow .2s;
+	z-index: 100003;
+}
+#panelbtn:hover{
+	transform: scale(0.9);
+	box-shadow: 0 0.5vmin 1vmin rgba(0, 0, 0, 0.5);
+}
+#panelbtn.host::after{
+	content: "";
+	width: 8vmin;
+	height: 8vmin;
+	background-image: url("https://jchabin.github.io/cars/gear.png");
+	background-size: cover;
+	filter: invert(1);
+}
+#panelbtn svg{
+	width: 8vmin;
+	height: 8vmin;
+}
+.badge{
+	display: none;
+	position: absolute;
+	top: -1vmin;
+	right: -1vmin;
+	min-width: 5vmin;
+	height: 5vmin;
+	padding: 0 1vmin;
+	box-sizing: border-box;
+	border-radius: 2.5vmin;
+	background-color: #ff3b30;
+	font-family: Arial, sans-serif;
+	font-size: 3vmin;
+	line-height: 5vmin;
+	text-align: center;
+}
+.badge.show{
+	display: block;
+}
+#panel{
+	position: absolute;
+	top: 13vmin;
+	right: 2vmin;
+	bottom: 19vmin;
+	width: min(64vmin, 96vw);
+	box-sizing: border-box;
+	padding: 2vmin;
+	display: flex;
+	flex-direction: column;
+	color: white;
+	text-align: left;
+	background-color: rgba(0, 0, 0, 0.75);
+	border: 1vmin solid white;
+	z-index: 100003;
+}
+#paneltitle{
+	font-size: 5vmin;
+	text-align: center;
+	text-shadow: 0 0 2vmin white;
+	margin-bottom: 1.5vmin;
+}
+#playerlist{
+	max-height: 24vmin;
+	overflow-y: auto;
+	margin-bottom: 1.5vmin;
+}
+.prow{
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.5vmin 0;
+	font-family: Arial, sans-serif;
+	font-size: 3.5vmin;
+}
+.cfgbtn.kick{
+	height: 6vmin;
+	min-width: 0;
+	margin: 0 0 0 1.5vmin;
+	padding: 0 2vmin;
+	font-size: 3vmin;
+}
+#chatlog{
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 1vmin;
+	background-color: rgba(255, 255, 255, 0.08);
+	font-family: Arial, sans-serif;
+	font-size: 3.2vmin;
+}
+.chatline{
+	margin-bottom: 0.8vmin;
+	word-break: break-word;
+}
+.chatline.sys{
+	opacity: 0.7;
+	font-style: italic;
+}
+#chatrow{
+	display: flex;
+	margin-top: 1.5vmin;
+}
+#chatinput{
+	flex: 1;
+	min-width: 0;
+	box-sizing: border-box;
+	height: 8vmin;
+	padding: 0 1.5vmin;
+	font-family: Arial, sans-serif;
+	font-size: 3.5vmin;
+	color: white;
+	background-color: rgba(0, 0, 0, 0.5);
+	border: 1vmin solid white;
+	outline: none;
+}
+#chatsend{
+	height: 8vmin;
+	margin-left: 1.5vmin;
+	font-size: 3.5vmin;
+}
