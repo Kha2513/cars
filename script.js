@@ -77,6 +77,7 @@ var CFG_LIMITS = {laps: [1, 20, 1], speed: [10, 300, 10], time: [30, 600, 15]};
 var cfg = {mode: "race", laps: LAPS, speed: 100, time: 120};
 var brakeKey = false;
 var chatLog = [], unread = 0;
+var adminIds = {};
 var votes = {}, myVote = false, voteCount = {y: 0, n: 0}, roundTimers = [];
 var dashKey = false, dashTouch = false, dashEnergy = 1, dashLocked = false, dashFill;
 var carPos = [
@@ -924,8 +925,16 @@ function sendChat(){
 		net.hostConn.send({t: "c", text: text});
 }
 
+function adminSelf(){
+	return !!(window.cloud && cloud.user && cloud.isAdmin);
+}
+
+function hostLike(){
+	return net.isHost || adminSelf();
+}
+
 function kickPlayer(id){
-	if(!net.isHost || id == me.id)
+	if(!net.isHost || id == me.id || adminIds[id])
 		return;
 	var conn = net.conns[id];
 	var pl = players[id];
@@ -947,8 +956,12 @@ function kickPlayer(id){
 function panelClick(e){
 	var t = e.target;
 	var act = t.getAttribute ? t.getAttribute("data-act") : null;
-	if(act == "kick")
-		kickPlayer(t.getAttribute("data-id"));
+	if(act == "kick"){
+		if(net.isHost)
+			kickPlayer(t.getAttribute("data-id"));
+		else if(adminSelf() && net.hostConn && net.hostConn.open)
+			net.hostConn.send({t: "ak", id: t.getAttribute("data-id")});
+	}
 	else if(act == "send")
 		sendChat();
 }
@@ -967,7 +980,7 @@ function openPanel(){
 	var el = document.createElement("DIV");
 	el.id = "panel";
 	el.className = "title";
-	el.innerHTML = "<div id='paneltitle'>" + (net.isHost ? "Players" : "Chat") + "</div>" + (net.isHost ? "<div id='playerlist'></div>" : "") + "<div id='chatlog'></div><div id='chatrow'><input id='chatinput' maxlength='200' placeholder='Say something'><div id='chatsend' class='cfgbtn' data-act='send'>Send</div></div>";
+	el.innerHTML = "<div id='paneltitle'>" + (hostLike() ? "Players" : "Chat") + "</div>" + (hostLike() ? "<div id='playerlist'></div>" : "") + "<div id='chatlog'></div><div id='chatrow'><input id='chatinput' maxlength='200' placeholder='Say something'><div id='chatsend' class='cfgbtn' data-act='send'>Send</div></div>";
 	el.addEventListener("click", panelClick);
 	f.appendChild(el);
 	renderPlayers();
@@ -1196,8 +1209,8 @@ function startRace(c, it){
 	f.appendChild(bar);
 	var pb = document.createElement("DIV");
 	pb.id = "panelbtn";
-	pb.className = net.isHost ? "host" : "chat";
-	pb.innerHTML = (net.isHost ? "" : "<svg viewBox='0 0 24 24'><path d='M4 5h16v11H9l-5 4z' fill='none' stroke='currentColor' stroke-width='2' stroke-linejoin='round'/></svg>") + "<div class='badge' id='badge'></div>";
+	pb.className = hostLike() ? "host" : "chat";
+	pb.innerHTML = (hostLike() ? "" : "<svg viewBox='0 0 24 24'><path d='M4 5h16v11H9l-5 4z' fill='none' stroke='currentColor' stroke-width='2' stroke-linejoin='round'/></svg>") + "<div class='badge' id='badge'></div>";
 	pb.addEventListener("click", togglePanel);
 	f.appendChild(pb);
 	dashFill = document.getElementById("dashfill");
@@ -1251,6 +1264,12 @@ function hostMessage(conn, m){
 		d.x = carPos[count].x;
 		d.y = carPos[count].y;
 		net.conns[id] = conn;
+		if(m.admin && window.cloud && cloud.verifyAdmin){
+			cloud.verifyAdmin(m.admin, net.peer.id).then(function(ok){
+				if(ok && players[id])
+					adminIds[id] = true;
+			});
+		}
 		var fc = cleanFace(m.face);
 		var sd = cleanFace(m.side);
 		addPlayer(id, d, false, fc, sd);
@@ -1259,6 +1278,9 @@ function hostMessage(conn, m){
 		for(var fid in arts)
 			conn.send({t: "f", id: fid, face: arts[fid].face, side: arts[fid].side});
 		broadcast({t: "a", id: id, d: d, face: fc, side: sd}, id);
+	}else if(m.t == "ak"){
+		if(adminIds[id] && typeof m.id == "string")
+			kickPlayer(m.id);
 	}else if(m.t == "c"){
 		var text = String(m.text || "").trim().substring(0, 200);
 		if(players[id] && text)
@@ -1309,6 +1331,7 @@ function startHosting(onCode){
 		conn.on("close", function(){
 			if(net.conns[conn.peer] === conn){
 				delete net.conns[conn.peer];
+				delete adminIds[conn.peer];
 				removePlayer(conn.peer);
 				broadcast({t: "r", id: conn.peer});
 			}
@@ -1356,7 +1379,13 @@ function joinLobby(c, fail){
 				document.getElementById("trackcode").innerHTML = track;
 				deleteMap();
 				eval(loadMap());
-				conn.send({t: "j", d: {color: color, sat: sat, light: light, name: name}, face: faceData, side: sideData});
+				var sendJoin = function(proof){
+					conn.send({t: "j", d: {color: color, sat: sat, light: light, name: name}, face: faceData, side: sideData, admin: proof});
+				};
+				if(window.cloud && cloud.adminProof)
+					cloud.adminProof(conn.peer).then(sendJoin);
+				else
+					sendJoin(null);
 			}else if(m.t == "y"){
 				done = true;
 				joined = true;
