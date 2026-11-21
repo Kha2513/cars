@@ -1,5 +1,6 @@
 (function(){
-	var cloud = window.cloud = {enabled: false, ready: false, user: null, profile: null, listeners: []};
+	var cloud = window.cloud = {enabled: false, ready: false, user: null, profile: null, isAdmin: false, isOwner: false, notice: "", listeners: []};
+	var OWNER = "kha2513";
 	var EMAIL_DOMAIN = "@cars.invalid";
 	var ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
@@ -91,6 +92,8 @@
 		var out = {};
 		if(typeof p.name == "string")
 			out.name = p.name.substring(0, 50);
+		if(typeof p.bio == "string")
+			out.bio = p.bio.substring(0, 140);
 		if(isFinite(p.color))
 			out.color = Math.min(360, Math.max(0, Math.round(p.color)));
 		if(isFinite(p.sat))
@@ -124,6 +127,8 @@
 			doc.updated = stamp();
 			return db.collection("users").doc(cred.user.uid).set(doc).then(function(){
 				cloud.user = {uid: cred.user.uid, username: n};
+				cloud.isOwner = n.toLowerCase() == OWNER;
+				cloud.isAdmin = cloud.isOwner;
 				cloud.profile = cleanProfile(doc);
 				cloud.ready = true;
 				registering = false;
@@ -219,31 +224,154 @@
 		return db.collection("tracks").doc(id).delete().catch(fail);
 	};
 
+	function userOf(snap){
+		var d = snap.data();
+		return {id: snap.id, username: d.username, name: d.name || "", bio: d.bio || "", color: d.color, sat: d.sat, light: d.light, face: d.face || null, side: d.side || null, admin: d.admin === true || d.usernameLower == OWNER, owner: d.usernameLower == OWNER, banned: d.banned === true, deleted: d.deleted === true};
+	}
+
+	cloud.users = function(){
+		return db.collection("users").limit(300).get().then(function(q){
+			var out = [];
+			q.forEach(function(s){
+				var u = userOf(s);
+				if(!u.deleted && u.username)
+					out.push(u);
+			});
+			return out.sort(function(a, b){
+				return a.username.toLowerCase() < b.username.toLowerCase() ? -1 : 1;
+			});
+		}).catch(fail);
+	};
+
+	cloud.userTracks = function(uid){
+		return db.collection("tracks").where("ownerId", "==", uid).where("public", "==", true).get().then(function(q){
+			var out = [];
+			q.forEach(function(s){
+				out.push(trackOf(s));
+			});
+			return newestFirst(out);
+		}).catch(fail);
+	};
+
+	cloud.setBanned = function(uid, banned){
+		return db.collection("users").doc(uid).set({banned: !!banned, updated: stamp()}, {merge: true}).catch(fail);
+	};
+
+	cloud.giveAdmin = function(uid){
+		return db.collection("users").doc(uid).set({admin: true, updated: stamp()}, {merge: true}).catch(fail);
+	};
+
+	cloud.adminDelete = function(uid){
+		return db.collection("tracks").where("ownerId", "==", uid).get().then(function(q){
+			var batch = db.batch();
+			q.forEach(function(s){
+				batch.delete(s.ref);
+			});
+			batch.set(db.collection("users").doc(uid), {deleted: true, banned: false, name: "", bio: "", face: null, side: null, updated: stamp()}, {merge: true});
+			return batch.commit();
+		}).catch(fail);
+	};
+
+	cloud.deleteAccount = function(code){
+		var u = auth.currentUser;
+		if(!u)
+			return Promise.reject(new Error("Log in first."));
+		var cred = firebase.auth.EmailAuthProvider.credential(u.email, normCode(code));
+		return u.reauthenticateWithCredential(cred).then(function(){
+			return db.collection("tracks").where("ownerId", "==", u.uid).get();
+		}).then(function(q){
+			var batch = db.batch();
+			q.forEach(function(s){
+				batch.delete(s.ref);
+			});
+			batch.delete(db.collection("users").doc(u.uid));
+			return batch.commit();
+		}).then(function(){
+			registering = true;
+			return u.delete();
+		}).then(function(){
+			registering = false;
+			cloud.user = null;
+			cloud.profile = null;
+			cloud.isAdmin = false;
+			cloud.isOwner = false;
+			emit();
+		}).catch(function(e){
+			registering = false;
+			return fail(e);
+		});
+	};
+
+	cloud.adminProof = function(host){
+		if(!cloud.user || !cloud.isAdmin)
+			return Promise.resolve(null);
+		return db.collection("sessions").add({uid: cloud.user.uid, host: String(host), created: stamp(), expires: firebase.firestore.Timestamp.fromMillis(Date.now() + 43200000)}).then(function(ref){
+			return {sid: ref.id, uid: cloud.user.uid};
+		}).catch(function(){
+			return null;
+		});
+	};
+
+	cloud.verifyAdmin = function(proof, host){
+		if(!proof || typeof proof.sid != "string" || typeof proof.uid != "string")
+			return Promise.resolve(false);
+		return db.collection("sessions").doc(proof.sid).get().then(function(s){
+			if(!s.exists)
+				return false;
+			var d = s.data();
+			var exp = d.expires && d.expires.toMillis ? d.expires.toMillis() : 0;
+			if(d.uid !== proof.uid || d.host !== host || exp < Date.now())
+				return false;
+			return db.collection("users").doc(proof.uid).get().then(function(u){
+				if(!u.exists)
+					return false;
+				var x = u.data();
+				return x.banned !== true && x.deleted !== true && (x.admin === true || x.usernameLower == OWNER);
+			});
+		}).catch(function(){
+			return false;
+		});
+	};
+
 	auth.onAuthStateChanged(function(user){
 		if(registering)
 			return;
 		if(!user){
 			cloud.user = null;
 			cloud.profile = null;
+			cloud.isAdmin = false;
+			cloud.isOwner = false;
 			cloud.ready = true;
 			emit();
 			return;
 		}
 		var fallback = user.email ? user.email.split("@")[0] : "player";
+		function finish(){
+			cloud.ready = true;
+			emit();
+		}
 		db.collection("users").doc(user.uid).get().then(function(snap){
-			if(snap.exists){
-				cloud.user = {uid: user.uid, username: snap.data().username || fallback};
-				cloud.profile = cleanProfile(snap.data());
+			var d = snap.exists ? snap.data() : null;
+			if(d && (d.banned === true || d.deleted === true)){
+				cloud.notice = d.deleted === true ? "This account was deleted." : "This account is banned.";
+				return auth.signOut();
+			}
+			if(d){
+				cloud.user = {uid: user.uid, username: d.username || fallback};
+				cloud.profile = cleanProfile(d);
+				cloud.isOwner = d.usernameLower == OWNER;
+				cloud.isAdmin = d.admin === true || cloud.isOwner;
 			}else{
 				cloud.user = {uid: user.uid, username: fallback};
 				cloud.profile = null;
+				cloud.isOwner = false;
+				cloud.isAdmin = false;
 			}
+			finish();
 		}).catch(function(){
 			cloud.user = {uid: user.uid, username: fallback};
 			cloud.profile = null;
-		}).then(function(){
-			cloud.ready = true;
-			emit();
+			finish();
 		});
 	});
 })();
