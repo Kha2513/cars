@@ -21,18 +21,14 @@ function MODS(){
 setTimeout(function(){
 	document.getElementById("title").style.transform = "none";
 }, 500);
-setTimeout(function(){
-	document.getElementsByClassName("menuitem")[0].style.transform = "none";
-}, 1000);
-setTimeout(function(){
-	document.getElementsByClassName("menuitem")[1].style.transform = "none";
-}, 1200);
-setTimeout(function(){
-	document.getElementById("mywebsitelink").style.transform = "none";
-}, 1600);
-setTimeout(function(){
-	document.getElementById("settings").style.transform = "none";
-}, 1800);
+var menuItems = document.getElementsByClassName("menuitem");
+for(var mi = 0; mi < menuItems.length; mi++){
+	(function(el, delay){
+		setTimeout(function(){
+			el.style.transform = "none";
+		}, delay);
+	})(menuItems[mi], 1000 + mi * 200);
+}
 
 if(top != self) {
 	document.getElementById("warning").style.display = "block";
@@ -126,6 +122,8 @@ function saveProfile(){
 	try{
 		localStorage.setItem("carsProfile", JSON.stringify({name: nameBox.value, color: color, sat: sat, light: light, face: faceData, side: sideData}));
 	}catch(e){}
+	if(typeof cloudSaveSoon == "function")
+		cloudSaveSoon();
 }
 
 function loadProfile(){
@@ -1350,7 +1348,12 @@ function joinLobby(c, fail){
 					return;
 				}
 				document.getElementsByClassName("info")[0].innerHTML = "<div class='info title'>Waiting for the game to start...<div id='code'>" + c + "</div></div>";
-				document.getElementById("trackcode").innerHTML = m.m;
+				var track = window.cloud ? cloud.cleanTrack(m.m) : null;
+				if(!track){
+					bail();
+					return;
+				}
+				document.getElementById("trackcode").innerHTML = track;
 				deleteMap();
 				eval(loadMap());
 				conn.send({t: "j", d: {color: color, sat: sat, light: light, name: name}, face: faceData, side: sideData});
