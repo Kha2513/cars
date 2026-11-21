@@ -14,6 +14,11 @@
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1">
 		<link href="style.css" rel="stylesheet">
+		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+		<script src="../firebase-config.js"></script>
+		<script src="../cloud.js"></script>
 		<title>Track Editor</title>
 	</head>
 	<body>
@@ -43,9 +48,13 @@
 			<div class="button" onclick="imp()">Import</div>
 			<div class="button" onclick="exp()">Export</div>
 			<div class="button" onclick="dedupTrees()">T-Dedup</div>
+			<div class="button" onclick="openCloud()">Cloud</div>
 			<div class="button big" onclick="help()">?</div>
 		</div>
 		<canvas id="c"></canvas>
+		<div id="cloudpanel"></div>
+		<div id="gate"><div id="gatebox"><div id="gatetext">Checking login...</div><a id="gatelink" href="../">Back to the game</a></div></div>
 		<script src="script.js"></script>
+		<script src="editor-cloud.js"></script>
 	</body>
 </html>
