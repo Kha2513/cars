@@ -18,6 +18,11 @@
 		<link href="style.css" rel="stylesheet">
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/86/three.min.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+		<script src="firebase-config.js"></script>
+		<script src="cloud.js"></script>
 		<script data-ad-client="ca-pub-8222390470642566" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
 		<title>khas Racing Game!</title>
 	</head>
@@ -29,19 +34,16 @@
 		<div id="version">v1.1.3.14</div>
 		<div id="menu">
 			<div class="title" id="title">kha's racing game!</div>
-			<div class="menuitem title">Pick a name:<div class="row"><div id="facebtn" title="Customize your car" onclick="openFaceEditor()"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8.5" cy="10" r="1.5" fill="currentColor"/><circle cx="15.5" cy="10" r="1.5" fill="currentColor"/><path d="M7.5 14.5q4.5 4 9 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div><input id="name" class="title" ontouchstart="this.focus()" placeholder="Name"><div id="randname" title="Random name" onclick="randomName()"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="8" r="1.7" fill="currentColor"/><circle cx="16" cy="8" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="8" cy="16" r="1.7" fill="currentColor"/><circle cx="16" cy="16" r="1.7" fill="currentColor"/></svg></div></div></div>
+			<div class="menuitem" id="account"></div>
+			<div class="menuitem title"><div class="row"><div id="facebtn" title="Customize your car" onclick="openFaceEditor()"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8.5" cy="10" r="1.5" fill="currentColor"/><circle cx="15.5" cy="10" r="1.5" fill="currentColor"/><path d="M7.5 14.5q4.5 4 9 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div><input id="name" class="title" ontouchstart="this.focus()" placeholder="Name"><div id="randname" title="Random name" onclick="randomName()"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="8" r="1.7" fill="currentColor"/><circle cx="16" cy="8" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="8" cy="16" r="1.7" fill="currentColor"/><circle cx="16" cy="16" r="1.7" fill="currentColor"/></svg></div></div></div>
 			<div class="menuitem title"><div id="start" onclick="menu2()">Start!</div></div>
+			<div class="menuitem title" id="links"><div class="cfgbtn small" id="trackbtn" onclick="openTracks()">Tracks</div><div class="cfgbtn small locked" id="editbtn" onclick="openEditor()">Editor</div><div class="cfgbtn small" id="helpbtn" onclick="openHelp()">Help</div></div>
 		</div>
-		<div id="settings" onclick="document.getElementById('toolbar').classList.toggle('sel')"></div>
-		<div id="toolbar">
-			<div class="tools" id="edit" onclick="location.href.includes('index.html') ? window.open('editor/index.html') : window.open('editor')"></div>
-			<div class="tools" id="help" onclick="location.href.includes('index.html') ? window.open('help/index.html') : window.open('help')">?</div>
-		</div>
-		<a id="mywebsitelink" href="https://johnnychabin.com/?projects" target="_blank"></a>
 		<div id="warning">
 			
 		</div>
 	</div>
 	<script src="script.js"></script>
+	<script src="account.js"></script>
 	</body>
 </html>
