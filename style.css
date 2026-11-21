@@ -187,91 +187,6 @@ input{
 .thumb:hover{
 	transform: translate(-3.5vmin, -1.75vmin) scale(1.2);
 }
-#settings{
-	height: 20vmin;
-	width: 20vmin;
-	background-color: #6eb0ea;
-	position: absolute;
-	bottom: 2vmin;
-	right: 2vmin;
-	opacity: 1;
-	border-radius: 10vmin;
-	cursor: pointer;
-	box-shadow: 0 2vmin 3vmin rgba(0, 0, 0, 0.5);
-	transition: transform .2s, box-shadow .2s, background .2s;
-	transform: translate3d(50vw, 0, 0);
-	z-index: 100;
-}
-#settings::after{
-	content: "";
-	background-image: url("https://jchabin.github.io/cars/gear.png");
-	background-size: cover;
-	height: 10vmin;
-	width: 10vmin;
-	position: absolute;
-	bottom: 5vmin;
-	left: 5vmin;
-	filter: invert(1);
-	transition: transform .2s;
-}
-#settings:hover{
-	transform: scale(0.9) rotate(45deg) !important;
-	box-shadow: 0 0.5vmin 1vmin rgba(0, 0, 0, 0.5);
-}
-#toolbar{
-	width: 22vmin;
-	height: 85vmin;
-	border-radius: 11vmin;
-	background-color: rgba(0, 0, 0, 0.5);
-	position: absolute;
-	right: 1vmin;
-	bottom: 1vmin;
-	transform: scaleY(0);
-	transition: transform .5s;
-	transform-origin: 50% 87.5%;
-}
-#toolbar.sel{
-	transform: scaleY(1);
-}
-.tools{
-	height: 20vmin;
-	width: 20vmin;
-	background-color: #db6262;
-	border-radius: 10vmin;
-	cursor: pointer;
-	transition: transform .2s, box-shadow .2s, background .2s;
-	margin: 1vmin;
-	box-shadow: 0 1vmin 2vmin rgba(0, 0, 0, 0.5);
-}
-.tools:hover{
-	transform: scale(0.9) !important;
-	box-shadow: 0 0.5vmin 1vmin rgba(0, 0, 0, 0.5);
-}
-.tools::after{
-	content: "";
-	display: inline-block;
-	background-image: url("https://jchabin.github.io/cars/newTrack.png");
-	filter: invert(1);
-	background-size: cover;
-	margin-top: 5vmin;
-	height: 10vmin;
-	width: 10vmin;
-	transition: transform .2s;
-}
-#edit{
-	background-color: #55db8f;
-}
-#help{
-	background-color: #9a55db;
-	font-family: Arial;
-	color: white;
-	font-size: 15vmin;
-	text-align: center;
-	line-height: 20vmin;
-}
-#help::after{
-	display: none;
-}
 #start{
 /* 	animation: slideleft 1s -0.25s forwards; */
 	font-size: 8vmin;
@@ -436,15 +351,6 @@ input{
 	z-index: 100000;
 	top: 0;
 	left: 3vmin;
-}
-#mywebsitelink{
-	display: none;
-	position: absolute;
-	bottom: 0;
-	left: 0;
-	transform: translate3d(-100vw, 0, 0);
-	transition: transform .5s ease-in-out;
-	line-height: 0;
 }
 #warning{
 	position: absolute;
@@ -929,4 +835,142 @@ input{
 }
 #endmenu.min #endopen{
 	display: flex;
+}
+#account{
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-family: Arial, sans-serif;
+	font-size: 4vmin;
+}
+.acctext{
+	margin-right: 1vmin;
+	font-weight: bold;
+	text-shadow: 0 0 1vmin black;
+}
+.cfgbtn.small{
+	height: 8vmin;
+	min-width: 0;
+	padding: 0 3vmin;
+	margin-left: 1.5vmin;
+	font-size: 3.6vmin;
+}
+.cfgbtn.locked{
+	opacity: 0.45;
+}
+#links{
+	display: flex;
+	justify-content: center;
+}
+#links .cfgbtn{
+	margin: 0 1vmin;
+}
+#trackbtn{
+	display: block;
+	max-width: 42vmin;
+	line-height: 6vmin;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.overlay{
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: rgba(0, 0, 0, 0.75);
+	z-index: 100002;
+}
+.modalbox{
+	box-sizing: border-box;
+	width: min(94vw, 110vmin);
+	max-height: 98%;
+	padding: 3vmin;
+	color: white;
+	text-align: center;
+	background-color: rgba(0, 0, 0, 0.5);
+	border: 1vmin solid white;
+	box-shadow: 0 2vmin 3vmin rgba(0, 0, 0, 0.5);
+}
+.modaltitle{
+	font-size: 7vmin;
+	line-height: 1.1;
+	text-shadow: 0 0 2vmin white;
+}
+.modalmsg{
+	min-height: 4vmin;
+	margin: 1.5vmin 0;
+	font-family: Arial, sans-serif;
+	font-size: 3.2vmin;
+}
+.field{
+	box-sizing: border-box;
+	display: block;
+	width: 100%;
+	height: 9vmin;
+	margin: 1.5vmin 0 0;
+	padding: 0 2vmin;
+	font-family: Arial, sans-serif;
+	font-size: 4vmin;
+	color: white;
+	background-color: rgba(0, 0, 0, 0.5);
+	border: 1vmin solid white;
+	outline: none;
+}
+.modalrow{
+	display: flex;
+	justify-content: center;
+	margin-top: 2.5vmin;
+}
+.modalrow .cfgbtn{
+	margin: 0 0.75vmin;
+}
+#authtabs{
+	display: flex;
+	justify-content: center;
+	margin-top: 1.5vmin;
+}
+#authtabs .cfgbtn{
+	margin: 0 0.75vmin;
+}
+#codebox{
+	margin: 1.5vmin 0;
+	padding: 2vmin;
+	font-family: monospace;
+	font-size: 4.6vmin;
+	letter-spacing: 0.3vmin;
+	word-break: break-all;
+	background-color: rgba(255, 255, 255, 0.1);
+	border: 1vmin solid white;
+	-webkit-user-select: all;
+	user-select: all;
+}
+#tracklist{
+	max-height: 38vmin;
+	overflow-y: auto;
+	text-align: left;
+	font-family: Arial, sans-serif;
+}
+.trow{
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 1vmin 0;
+	font-size: 3.6vmin;
+	border-bottom: 0.3vmin solid rgba(255, 255, 255, 0.3);
+}
+.tinfo{
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+.tinfo span{
+	margin-left: 1.5vmin;
+	font-size: 3vmin;
+	opacity: 0.7;
 }
