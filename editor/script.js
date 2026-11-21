@@ -208,9 +208,14 @@ ca.onmouseup = function(e){
 }
 
 function imp(){
-	var text = prompt("Track data?").trim().split("|");
-	
-	if(!text || text.length < 4)
+	var t = prompt("Track data?");
+	if(t)
+		loadTrack(t);
+}
+function loadTrack(str){
+	var text = String(str).trim().split("|");
+
+	if(text.length < 4)
 		return;
 
 	var wallsText = text[0].split(" ");
@@ -279,7 +284,7 @@ function imp(){
 	}
 }
 
-function exp(){
+function trackText(){
 	var text = "";
 	for(var i = 0; i < walls.length; i++){
 		text += walls[i].start.x - Math.floor(width / scale / 2) + ",";
@@ -306,9 +311,11 @@ function exp(){
 		text += Math.floor(90 - arrows[i].angle * 180 / Math.PI) + " ";
 	}
 	text += "|";
-	text += "<br/>";
+	return text;
+}
+function exp(){
 	var win = window.open();
-	win.document.body.innerHTML = text;
+	win.document.body.innerHTML = trackText() + "<br/>";
 }
 
 document.body.onkeydown = function(e){
