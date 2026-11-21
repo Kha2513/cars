@@ -1,7 +1,7 @@
 var authTab = "login", authInfo = null, authSaved = false, authUserVal = "", authBusy = false;
 var applyingCloud = false, cloudTimer = null;
 var defaultTrack = document.getElementById("trackcode").innerHTML;
-var trackName = "", trackTab = "shared", trackItems = [];
+var trackName = "", trackTab = "shared", trackItems = [], userItems = [], profileTracks = [], adminList = [], acctState = "main";
 
 function localProfile(){
 	return {name: nameBox.value, color: color, sat: sat, light: light, face: faceData, side: sideData};
@@ -44,7 +44,7 @@ function renderAccount(){
 		label.textContent = "Loading account...";
 	}else if(cloud.user){
 		label.textContent = "Hi, " + cloud.user.username;
-		el.insertAdjacentHTML("beforeend", "<div class='cfgbtn small' data-act='logout'>Log out</div>");
+		el.insertAdjacentHTML("beforeend", "<div class='cfgbtn small' data-act='settings'>Settings</div>" + (cloud.isAdmin ? "<div class='cfgbtn small' data-act='admin'>Admin</div>" : ""));
 	}else{
 		label.textContent = "Guest";
 		el.insertAdjacentHTML("beforeend", "<div class='cfgbtn small' data-act='login'>Log in</div><div class='cfgbtn small' data-act='register'>Register</div>");
@@ -59,8 +59,10 @@ function accountClick(e){
 		openAuth("login", "");
 	else if(act == "register")
 		openAuth("register", "");
-	else if(act == "logout")
-		cloud.logout();
+	else if(act == "settings")
+		openAccountSettings();
+	else if(act == "admin")
+		openAdmin();
 }
 
 function copyText(t){
@@ -233,12 +235,6 @@ function openAuth(tab, msg){
 	renderAuth(msg);
 }
 
-function updateTrackBtn(){
-	var b = document.getElementById("trackbtn");
-	if(b)
-		b.textContent = trackName ? "Track: " + trackName : "Tracks";
-}
-
 function closeTracks(){
 	var el = document.getElementById("tracks");
 	if(el)
@@ -252,7 +248,36 @@ function renderTracks(){
 	var mine = window.cloud && cloud.user;
 	if(!mine && trackTab == "mine")
 		trackTab = "shared";
-	el.innerHTML = "<div class='modalbox title'><div class='modaltitle'>Tracks</div><div id='authtabs'><div class='cfgbtn small" + (trackTab == "shared" ? " sel" : "") + "' data-act='ttab' data-val='shared'>Shared</div>" + (mine ? "<div class='cfgbtn small" + (trackTab == "mine" ? " sel" : "") + "' data-act='ttab' data-val='mine'>Mine</div>" : "") + "</div><div class='modalmsg' id='trackmsg'></div><div id='tracklist'></div><div class='modalrow'><div class='cfgbtn small' data-act='default'>Default track</div><div class='cfgbtn small' data-act='tclose'>Close</div></div></div>";
+	function tabBtn(val, label){
+		return "<div class='cfgbtn small" + (trackTab == val ? " sel" : "") + "' data-act='ttab' data-val='" + val + "'>" + label + "</div>";
+	}
+	el.innerHTML = "<div class='modalbox title'><div class='modaltitle'>Online</div><div id='authtabs'>" + tabBtn("shared", "Tracks") + (mine ? tabBtn("mine", "Mine") : "") + tabBtn("users", "Users") + "</div><div class='modalmsg' id='trackmsg'></div><div id='tracklist'></div><div class='modalrow'>" + (trackTab == "users" ? "" : "<div class='cfgbtn small' data-act='default'>Default track</div>") + "<div class='cfgbtn small' data-act='tclose'>Close</div></div></div>";
+}
+
+function rowFor(info, buttons){
+	var row = document.createElement("DIV");
+	row.className = "trow";
+	var box = document.createElement("DIV");
+	box.className = "tinfo";
+	box.appendChild(info.b);
+	if(info.span)
+		box.appendChild(info.span);
+	row.appendChild(box);
+	for(var i = 0; i < buttons.length; i++){
+		var btn = document.createElement("DIV");
+		btn.className = "cfgbtn small";
+		btn.textContent = buttons[i][0];
+		btn.setAttribute("data-act", buttons[i][1]);
+		btn.setAttribute("data-i", buttons[i][2]);
+		row.appendChild(btn);
+	}
+	return row;
+}
+
+function textEl(tag, text){
+	var el = document.createElement(tag);
+	el.textContent = text;
+	return el;
 }
 
 function fillTracks(list, msg){
@@ -262,40 +287,42 @@ function fillTracks(list, msg){
 		return;
 	trackItems = list;
 	box.innerHTML = "";
-	m.textContent = msg || (list.length ? "" : "Nothing here yet.");
-	for(var i = 0; i < list.length; i++){
-		var row = document.createElement("DIV");
-		row.className = "trow";
-		var info = document.createElement("DIV");
-		info.className = "tinfo";
-		var b = document.createElement("B");
-		b.textContent = list[i].name;
-		var by = document.createElement("SPAN");
-		by.textContent = "by " + list[i].ownerName;
-		info.appendChild(b);
-		info.appendChild(by);
-		var use = document.createElement("DIV");
-		use.className = "cfgbtn small";
-		use.textContent = "Use";
-		use.setAttribute("data-act", "use");
-		use.setAttribute("data-i", i);
-		row.appendChild(info);
-		row.appendChild(use);
-		box.appendChild(row);
-	}
+	m.textContent = msg || (list.length ? (trackName ? "Using: " + trackName : "") : "Nothing here yet.");
+	for(var i = 0; i < list.length; i++)
+		box.appendChild(rowFor({b: textEl("B", list[i].name), span: textEl("SPAN", "by " + list[i].ownerName)}, [["Use", "use", i]]));
+}
+
+function userTags(u){
+	return (u.owner ? " [owner]" : u.admin ? " [admin]" : "") + (u.banned ? " [banned]" : "");
+}
+
+function fillUsers(list){
+	var box = document.getElementById("tracklist");
+	var m = document.getElementById("trackmsg");
+	if(!box)
+		return;
+	userItems = list;
+	box.innerHTML = "";
+	m.textContent = list.length ? "" : "No users yet.";
+	for(var i = 0; i < list.length; i++)
+		box.appendChild(rowFor({b: textEl("B", list[i].username), span: textEl("SPAN", userTags(list[i]).trim())}, [["View", "view", i]]));
 }
 
 function loadTrackList(){
 	var m = document.getElementById("trackmsg");
 	if(!window.cloud || !cloud.enabled){
-		m.textContent = "Shared tracks need accounts to be set up.";
+		m.textContent = "Online features need accounts to be set up.";
 		return;
 	}
 	m.textContent = "Loading...";
 	var tab = trackTab;
-	var p = tab == "mine" ? cloud.myTracks() : cloud.publicTracks();
+	var p = tab == "mine" ? cloud.myTracks() : tab == "users" ? cloud.users() : cloud.publicTracks();
 	p.then(function(list){
-		if(tab == trackTab)
+		if(tab != trackTab)
+			return;
+		if(tab == "users")
+			fillUsers(list);
+		else
 			fillTracks(list, "");
 	}).catch(function(e){
 		var mm = document.getElementById("trackmsg");
@@ -304,31 +331,35 @@ function loadTrackList(){
 	});
 }
 
+function useTrackItem(item){
+	var clean = item ? cloud.cleanTrack(item.data) : null;
+	if(!clean)
+		return false;
+	document.getElementById("trackcode").innerHTML = clean;
+	trackName = String(item.name).substring(0, 40);
+	return true;
+}
+
 function tracksClick(e){
 	var t = e.target;
 	var act = t.getAttribute ? t.getAttribute("data-act") : null;
 	if(t.id == "tracks" || act == "tclose"){
 		closeTracks();
 	}else if(act == "ttab"){
-		trackTab = t.getAttribute("data-val") == "mine" ? "mine" : "shared";
+		trackTab = t.getAttribute("data-val") == "mine" ? "mine" : t.getAttribute("data-val") == "users" ? "users" : "shared";
 		renderTracks();
 		loadTrackList();
 	}else if(act == "default"){
 		document.getElementById("trackcode").innerHTML = defaultTrack;
 		trackName = "";
-		updateTrackBtn();
 		closeTracks();
 	}else if(act == "use"){
-		var item = trackItems[Number(t.getAttribute("data-i"))];
-		var clean = item ? cloud.cleanTrack(item.data) : null;
-		if(!clean){
+		if(useTrackItem(trackItems[Number(t.getAttribute("data-i"))]))
+			closeTracks();
+		else
 			document.getElementById("trackmsg").textContent = "That track has bad data.";
-			return;
-		}
-		document.getElementById("trackcode").innerHTML = clean;
-		trackName = String(item.name).substring(0, 40);
-		updateTrackBtn();
-		closeTracks();
+	}else if(act == "view"){
+		openProfile(userItems[Number(t.getAttribute("data-i"))]);
 	}
 }
 
@@ -341,6 +372,234 @@ function openTracks(){
 	f.appendChild(el);
 	renderTracks();
 	loadTrackList();
+}
+
+function closeProfile(){
+	var el = document.getElementById("profile");
+	if(el)
+		el.parentNode.removeChild(el);
+}
+
+function carBox(u, img, cls){
+	var b = document.createElement("DIV");
+	b.className = "carbox " + cls;
+	b.style.backgroundColor = "hsl(" + clampNum(u.color, 0, 360, 0) + ", " + clampNum(u.sat, 0, 100, 100) + "%, " + clampNum(u.light, 0, 100, 50) + "%)";
+	var clean = cleanFace(img);
+	if(clean)
+		b.style.backgroundImage = "url(" + clean + ")";
+	return b;
+}
+
+function profileClick(e){
+	var t = e.target;
+	var act = t.getAttribute ? t.getAttribute("data-act") : null;
+	if(t.id == "profile" || act == "pclose"){
+		closeProfile();
+	}else if(act == "puse"){
+		if(useTrackItem(profileTracks[Number(t.getAttribute("data-i"))])){
+			closeProfile();
+			closeTracks();
+		}
+	}
+}
+
+function openProfile(u){
+	if(!u)
+		return;
+	closeProfile();
+	var el = document.createElement("DIV");
+	el.id = "profile";
+	el.className = "overlay";
+	el.addEventListener("click", profileClick);
+	el.innerHTML = "<div class='modalbox title'><div class='modaltitle' id='ptitle'></div><div class='modalmsg' id='pname'></div><div class='modalmsg' id='pbio'></div><div id='pcars'><div><div id='pfront'></div><div class='carlabel'>Front</div></div><div><div id='pside'></div><div class='carlabel'>Side</div></div></div><div class='modalmsg' id='ptracksmsg'>Loading tracks...</div><div id='ptracklist'></div><div class='modalrow'><div class='cfgbtn small' data-act='pclose'>Close</div></div></div>";
+	f.appendChild(el);
+	document.getElementById("ptitle").textContent = u.username;
+	document.getElementById("pname").textContent = (u.name ? u.name : "") + userTags(u);
+	document.getElementById("pbio").textContent = u.bio;
+	document.getElementById("pfront").appendChild(carBox(u, u.face, "front"));
+	document.getElementById("pside").appendChild(carBox(u, u.side, "side"));
+	cloud.userTracks(u.id).then(function(list){
+		var box = document.getElementById("ptracklist");
+		if(!box)
+			return;
+		profileTracks = list;
+		document.getElementById("ptracksmsg").textContent = list.length ? "Shared tracks" : "No shared tracks.";
+		for(var i = 0; i < list.length; i++)
+			box.appendChild(rowFor({b: textEl("B", list[i].name)}, [["Use", "puse", i]]));
+	}).catch(function(err){
+		var m = document.getElementById("ptracksmsg");
+		if(m)
+			m.textContent = err.message;
+	});
+}
+
+function closeAcct(){
+	var el = document.getElementById("acct");
+	if(el)
+		el.parentNode.removeChild(el);
+}
+
+function renderAcct(msg){
+	var el = document.getElementById("acct");
+	if(!el || !cloud.user)
+		return;
+	var html = "<div class='modalbox title'><div class='modaltitle'>Settings</div><div class='modalmsg' id='acctmsg'></div>";
+	if(acctState == "delete"){
+		html += "<div class='modalmsg'>This deletes your account, profile and tracks forever. Enter your login code to confirm.</div><input class='field' id='deletecode' placeholder='Login code' autocomplete='off' autocapitalize='characters'><div class='modalrow'><div class='cfgbtn small' data-act='dodelete'>Delete forever</div><div class='cfgbtn small' data-act='back'>Back</div></div></div>";
+	}else{
+		html += "<div class='modalmsg' id='acctuser'></div><input class='field' id='bioinput' maxlength='140' placeholder='Your bio (shown on your profile)' autocomplete='off'><div class='modalrow'><div class='cfgbtn small' data-act='savebio'>Save bio</div><div class='cfgbtn small' data-act='logout'>Log out</div></div><div class='modalrow'><div class='cfgbtn small' data-act='askdelete'>Delete account</div><div class='cfgbtn small' data-act='aclose'>Close</div></div></div>";
+	}
+	el.innerHTML = html;
+	var m = document.getElementById("acctmsg");
+	if(m)
+		m.textContent = msg || "";
+	var au = document.getElementById("acctuser");
+	if(au)
+		au.textContent = "Logged in as " + cloud.user.username;
+	var bi = document.getElementById("bioinput");
+	if(bi)
+		bi.value = cloud.profile && cloud.profile.bio ? cloud.profile.bio : "";
+}
+
+function acctClick(e){
+	var t = e.target;
+	var act = t.getAttribute ? t.getAttribute("data-act") : null;
+	if(t.id == "acct" || act == "aclose"){
+		closeAcct();
+	}else if(act == "savebio"){
+		var bio = document.getElementById("bioinput").value.trim().substring(0, 140);
+		cloud.saveProfile({bio: bio}).then(function(){
+			if(cloud.profile)
+				cloud.profile.bio = bio;
+			renderAcct("Saved.");
+		}).catch(function(err){
+			renderAcct(err.message);
+		});
+	}else if(act == "logout"){
+		closeAcct();
+		cloud.logout();
+	}else if(act == "askdelete"){
+		acctState = "delete";
+		renderAcct("");
+	}else if(act == "back"){
+		acctState = "main";
+		renderAcct("");
+	}else if(act == "dodelete"){
+		cloud.deleteAccount(document.getElementById("deletecode").value).then(function(){
+			closeAcct();
+		}).catch(function(err){
+			renderAcct(err.message);
+		});
+	}
+}
+
+function openAccountSettings(){
+	if(!window.cloud || !cloud.user)
+		return;
+	closeAcct();
+	acctState = "main";
+	var el = document.createElement("DIV");
+	el.id = "acct";
+	el.className = "overlay";
+	el.addEventListener("click", acctClick);
+	f.appendChild(el);
+	renderAcct("");
+}
+
+function closeAdmin(){
+	var el = document.getElementById("admin");
+	if(el)
+		el.parentNode.removeChild(el);
+}
+
+function renderAdminList(){
+	var box = document.getElementById("adminlist");
+	var filter = document.getElementById("adminfilter");
+	if(!box)
+		return;
+	var q = filter.value.trim().toLowerCase();
+	box.innerHTML = "";
+	for(var i = 0; i < adminList.length; i++){
+		var u = adminList[i];
+		if(q && u.username.toLowerCase().indexOf(q) < 0)
+			continue;
+		var buttons = [];
+		var mineRow = cloud.user && u.id == cloud.user.uid;
+		if(!u.owner && !mineRow){
+			var canAct = cloud.isOwner || !u.admin;
+			if(canAct)
+				buttons.push([u.banned ? "Unban" : "Ban", u.banned ? "aunban" : "aban", i]);
+			if(cloud.isOwner && !u.admin)
+				buttons.push(["Admin", "agive", i]);
+			if(canAct)
+				buttons.push(["Delete", "adel", i]);
+		}
+		box.appendChild(rowFor({b: textEl("B", u.username), span: textEl("SPAN", userTags(u).trim())}, buttons));
+	}
+}
+
+function adminClick(e){
+	var t = e.target;
+	var act = t.getAttribute ? t.getAttribute("data-act") : null;
+	var u = adminList[Number(t.getAttribute ? t.getAttribute("data-i") : -1)];
+	var m = document.getElementById("adminmsg");
+	function done(p, after){
+		p.then(function(){
+			after();
+			m.textContent = "";
+			renderAdminList();
+		}).catch(function(err){
+			m.textContent = err.message;
+		});
+	}
+	if(t.id == "admin" || act == "adclose"){
+		closeAdmin();
+	}else if(!u){
+		return;
+	}else if(act == "aban"){
+		if(confirm("Ban " + u.username + "?"))
+			done(cloud.setBanned(u.id, true), function(){
+				u.banned = true;
+			});
+	}else if(act == "aunban"){
+		done(cloud.setBanned(u.id, false), function(){
+			u.banned = false;
+		});
+	}else if(act == "agive"){
+		if(confirm("Make " + u.username + " an admin?"))
+			done(cloud.giveAdmin(u.id), function(){
+				u.admin = true;
+			});
+	}else if(act == "adel"){
+		if(confirm("Delete the account " + u.username + "? Their profile and tracks are wiped."))
+			done(cloud.adminDelete(u.id), function(){
+				adminList.splice(adminList.indexOf(u), 1);
+			});
+	}
+}
+
+function openAdmin(){
+	if(!window.cloud || !cloud.user || !cloud.isAdmin)
+		return;
+	closeAdmin();
+	var el = document.createElement("DIV");
+	el.id = "admin";
+	el.className = "overlay";
+	el.addEventListener("click", adminClick);
+	el.innerHTML = "<div class='modalbox title'><div class='modaltitle'>Admin</div><input class='field' id='adminfilter' placeholder='Search users' autocomplete='off'><div class='modalmsg' id='adminmsg'>Loading...</div><div id='adminlist'></div><div class='modalrow'><div class='cfgbtn small' data-act='adclose'>Close</div></div></div>";
+	f.appendChild(el);
+	document.getElementById("adminfilter").addEventListener("input", renderAdminList);
+	cloud.users().then(function(list){
+		adminList = list;
+		var m = document.getElementById("adminmsg");
+		if(m)
+			m.textContent = "";
+		renderAdminList();
+	}).catch(function(err){
+		var m = document.getElementById("adminmsg");
+		if(m)
+			m.textContent = err.message;
+	});
 }
 
 function openEditor(){
@@ -357,11 +616,19 @@ function openHelp(){
 
 document.getElementById("account").addEventListener("click", accountClick);
 renderAccount();
-updateTrackBtn();
 
 if(window.cloud){
 	cloud.onChange(function(user, profile){
 		renderAccount();
+		if(!user && cloud.notice){
+			var note = cloud.notice;
+			cloud.notice = "";
+			openAuth("login", note);
+		}
+		if(!user){
+			closeAcct();
+			closeAdmin();
+		}
 		if(user && profile)
 			applyCloudProfile(profile);
 		else if(user)
