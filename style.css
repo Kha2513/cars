@@ -323,8 +323,10 @@ input{
 	display: inline-block;
 	padding: 2vmin;
 	position: absolute;
+	left: 0;
+	top: 0;
+	will-change: transform;
 	font-size: 3vmin;
-	transform: translateX(-50%) translateY(-100%);
 	text-align: center;
 	line-height: 4vmin;
 	z-index: 0;
@@ -967,7 +969,7 @@ input{
 	opacity: 0.7;
 }
 #ptracklist{
-	max-height: 16vmin;
+	max-height: 20vmin;
 }
 #adminlist{
 	max-height: 40vmin;
@@ -990,22 +992,50 @@ input{
 	align-items: flex-end;
 	margin: 1.5vmin 0;
 }
-#pcars > div{
-	margin: 0 2vmin;
-	font-family: Arial, sans-serif;
-	font-size: 2.8vmin;
+.preview{
+	flex-shrink: 0;
+	width: 18vmin;
+	height: 12vmin;
+	margin-right: 2vmin;
+	background-color: rgba(0, 0, 0, 0.35);
+	border: 0.5vmin solid rgba(255, 255, 255, 0.5);
 }
-.carbox{
+#ptracklist .preview{
+	width: 12vmin;
+	height: 8vmin;
+}
+#pcars .preview{
+	width: 30vmin;
+	height: 17vmin;
+	margin: 0;
+}
+#fuel{
+	position: absolute;
+	left: 2vmin;
+	top: 24vmin;
+	width: 12vmin;
+	text-align: center;
+	z-index: 99999;
+}
+#fuellabel{
+	color: white;
+	font-size: 3.6vmin;
+	text-shadow: 0 0 1vmin white;
+}
+#fuelbar{
 	box-sizing: border-box;
+	display: flex;
+	align-items: flex-end;
+	width: 6vmin;
+	height: 36vmin;
+	margin: 1vmin auto 0;
+	background-color: rgba(0, 0, 0, 0.5);
 	border: 1vmin solid white;
-	background-size: cover;
-	image-rendering: pixelated;
+	cursor: pointer;
 }
-.carbox.front{
-	width: 16vmin;
-	height: 16vmin;
-}
-.carbox.side{
-	width: 32vmin;
-	height: 16vmin;
+#fuelfill{
+	width: 100%;
+	height: 100%;
+	background-color: white;
+	box-shadow: 0 0 2vmin white;
 }
