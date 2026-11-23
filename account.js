@@ -257,6 +257,8 @@ function renderTracks(){
 function rowFor(info, buttons){
 	var row = document.createElement("DIV");
 	row.className = "trow";
+	if(info.preview)
+		row.appendChild(info.preview);
 	var box = document.createElement("DIV");
 	box.className = "tinfo";
 	box.appendChild(info.b);
@@ -289,7 +291,7 @@ function fillTracks(list, msg){
 	box.innerHTML = "";
 	m.textContent = msg || (list.length ? (trackName ? "Using: " + trackName : "") : "Nothing here yet.");
 	for(var i = 0; i < list.length; i++)
-		box.appendChild(rowFor({b: textEl("B", list[i].name), span: textEl("SPAN", "by " + list[i].ownerName)}, [["Use", "use", i]]));
+		box.appendChild(rowFor({preview: makeTrackPreview(list[i].data), b: textEl("B", list[i].name), span: textEl("SPAN", "by " + list[i].ownerName)}, [["Use", "use", i]]));
 }
 
 function userTags(u){
@@ -305,7 +307,7 @@ function fillUsers(list){
 	box.innerHTML = "";
 	m.textContent = list.length ? "" : "No users yet.";
 	for(var i = 0; i < list.length; i++)
-		box.appendChild(rowFor({b: textEl("B", list[i].username), span: textEl("SPAN", userTags(list[i]).trim())}, [["View", "view", i]]));
+		box.appendChild(rowFor({preview: makeCarPreview(list[i]), b: textEl("B", list[i].username), span: textEl("SPAN", userTags(list[i]).trim())}, [["View", "view", i]]));
 }
 
 function loadTrackList(){
@@ -380,16 +382,6 @@ function closeProfile(){
 		el.parentNode.removeChild(el);
 }
 
-function carBox(u, img, cls){
-	var b = document.createElement("DIV");
-	b.className = "carbox " + cls;
-	b.style.backgroundColor = "hsl(" + clampNum(u.color, 0, 360, 0) + ", " + clampNum(u.sat, 0, 100, 100) + "%, " + clampNum(u.light, 0, 100, 50) + "%)";
-	var clean = cleanFace(img);
-	if(clean)
-		b.style.backgroundImage = "url(" + clean + ")";
-	return b;
-}
-
 function profileClick(e){
 	var t = e.target;
 	var act = t.getAttribute ? t.getAttribute("data-act") : null;
@@ -411,13 +403,12 @@ function openProfile(u){
 	el.id = "profile";
 	el.className = "overlay";
 	el.addEventListener("click", profileClick);
-	el.innerHTML = "<div class='modalbox title'><div class='modaltitle' id='ptitle'></div><div class='modalmsg' id='pname'></div><div class='modalmsg' id='pbio'></div><div id='pcars'><div><div id='pfront'></div><div class='carlabel'>Front</div></div><div><div id='pside'></div><div class='carlabel'>Side</div></div></div><div class='modalmsg' id='ptracksmsg'>Loading tracks...</div><div id='ptracklist'></div><div class='modalrow'><div class='cfgbtn small' data-act='pclose'>Close</div></div></div>";
+	el.innerHTML = "<div class='modalbox title'><div class='modaltitle' id='ptitle'></div><div class='modalmsg' id='pname'></div><div class='modalmsg' id='pbio'></div><div id='pcars'></div><div class='modalmsg' id='ptracksmsg'>Loading tracks...</div><div id='ptracklist'></div><div class='modalrow'><div class='cfgbtn small' data-act='pclose'>Close</div></div></div>";
 	f.appendChild(el);
 	document.getElementById("ptitle").textContent = u.username;
 	document.getElementById("pname").textContent = (u.name ? u.name : "") + userTags(u);
 	document.getElementById("pbio").textContent = u.bio;
-	document.getElementById("pfront").appendChild(carBox(u, u.face, "front"));
-	document.getElementById("pside").appendChild(carBox(u, u.side, "side"));
+	document.getElementById("pcars").appendChild(makeCarPreview(u, 270, 150));
 	cloud.userTracks(u.id).then(function(list){
 		var box = document.getElementById("ptracklist");
 		if(!box)
@@ -425,7 +416,7 @@ function openProfile(u){
 		profileTracks = list;
 		document.getElementById("ptracksmsg").textContent = list.length ? "Shared tracks" : "No shared tracks.";
 		for(var i = 0; i < list.length; i++)
-			box.appendChild(rowFor({b: textEl("B", list[i].name)}, [["Use", "puse", i]]));
+			box.appendChild(rowFor({preview: makeTrackPreview(list[i].data, 108, 72), b: textEl("B", list[i].name)}, [["Use", "puse", i]]));
 	}).catch(function(err){
 		var m = document.getElementById("ptracksmsg");
 		if(m)
