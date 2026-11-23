@@ -5,6 +5,15 @@ var BOUNCE = 0.7;
 var mapscale = 5;
 var BOUNCE_CORRECT = 0.01;
 var WALL_SIZE = 1.2;
+var ENDPOINT_SQ = (WALL_SIZE + 0.1) * (WALL_SIZE + 0.1);
+var WALL_CLEAR = 1.5;
+var JET_RISE = 0.25;
+var JET_GRAV = 0.012;
+var JET_DRAIN = 0.005;
+var JET_REGEN = 0.01;
+var JET_REGEN_AIR = 0.0008;
+var JET_MAXH = 60;
+var SEND_MS = 33;
 var MOUNTAIN_DIST = 250;
 var OOB_DIST = 200;
 var LAPS = 3;
@@ -34,16 +43,15 @@ if(top != self) {
 	document.getElementById("warning").style.display = "block";
 }
 
-function forceScroll(){
-	requestAnimationFrame(forceScroll);
-	window.scrollTo(0, 0);
-}
-forceScroll();
+window.addEventListener("scroll", function(){
+	if(window.scrollX || window.scrollY)
+		window.scrollTo(0, 0);
+});
 
 var camera, renderer, scene, renderer2, scene2, labels = [];
 scene = new THREE.Scene();
 renderer = new THREE.WebGLRenderer();
-renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 var mobile = navigator.userAgent.match("Mobile")!=null||navigator.userAgent.match("Linux;")!=null;
 if(!mobile){
@@ -74,8 +82,10 @@ var name, code, players = {}, me = {}, gameStarted = false, gameSortaStarted = f
 var gameMode = "race", gameOver = false, speedMul = 1, tagTime = 120, tagEndsAt = 0, runnersAtStart = 0, roleEl, roleTimer;
 var TAG_DIST = 2.3;
 var CFG_LIMITS = {laps: [1, 20, 1], speed: [10, 300, 10], time: [30, 600, 15]};
-var cfg = {mode: "race", laps: LAPS, speed: 100, time: 120};
+var cfg = {mode: "race", laps: LAPS, speed: 100, time: 120, jetpacks: false};
 var brakeKey = false;
+var jetpacks = false, jetKey = false, jetTouch = false, jetFuel = 1, jetLocked = false, fuelFill, podGeo = null, podMat = null;
+var lapText = null, lastDashW = -1, lastFuelW = -1, lastSend = 0;
 var chatLog = [], unread = 0;
 var adminIds = {};
 var votes = {}, myVote = false, voteCount = {y: 0, n: 0}, roundTimers = [];
@@ -414,6 +424,8 @@ function resetCar(){
 	me.data.yv = 0;
 	me.data.dir = 0;
 	me.data.steer = 0;
+	me.data.h = 0;
+	me.data.hv = 0;
 	me.data.checkpoint = me.data.lap == 0 ? 1 : 0;
 	snapCamera = true;
 }
@@ -554,6 +566,10 @@ function snapshot(){
 }
 
 function sendMe(){
+	var nowMs = performance.now();
+	if(nowMs - lastSend < SEND_MS)
+		return;
+	lastSend = nowMs;
 	if(net.isHost)
 		broadcast({t: "u", id: me.id, d: me.data});
 	else if(net.hostConn && net.hostConn.open)
@@ -570,6 +586,9 @@ function newPlayerData(){
 		steer: 0,
 		dash: 0,
 		brake: 0,
+		h: 0,
+		hv: 0,
+		jet: 0,
 		color: color,
 		sat: sat,
 		light: light,
@@ -646,7 +665,8 @@ function sanitizeCfg(c){
 		mode: c.mode == "tag" ? "tag" : "race",
 		laps: Math.round(clampNum(c.laps, CFG_LIMITS.laps[0], CFG_LIMITS.laps[1], 3)),
 		speed: Math.round(clampNum(c.speed, CFG_LIMITS.speed[0], CFG_LIMITS.speed[1], 100)),
-		time: Math.round(clampNum(c.time, CFG_LIMITS.time[0], CFG_LIMITS.time[1], 120))
+		time: Math.round(clampNum(c.time, CFG_LIMITS.time[0], CFG_LIMITS.time[1], 120)),
+		jetpacks: c.jetpacks === true
 	};
 }
 
@@ -667,6 +687,7 @@ function cfgHtml(){
 		+ row("Mode", modes)
 		+ (tag ? row("Time", step("time", fmtTime(cfg.time))) : row("Laps", step("laps", cfg.laps)))
 		+ row("Speed", step("speed", cfg.speed + "%"))
+		+ row("Jetpacks", "<div class='cfgbtn" + (cfg.jetpacks ? "" : " sel") + "' data-act='jet' data-val='0'>Off</div><div class='cfgbtn" + (cfg.jetpacks ? " sel" : "") + "' data-act='jet' data-val='1'>On</div>")
 		+ "<div class='cfgbtn' id='cfgdone' data-act='done'>Done</div></div>";
 }
 
@@ -720,6 +741,8 @@ function cfgClick(e){
 	}
 	if(act == "mode")
 		cfg.mode = t.getAttribute("data-val") == "tag" ? "tag" : "race";
+	else if(act == "jet")
+		cfg.jetpacks = t.getAttribute("data-val") == "1";
 	else
 		return;
 	renderCfg();
@@ -1109,6 +1132,9 @@ function applyRestart(it, pos){
 		d.steer = 0;
 		d.dash = 0;
 		d.brake = 0;
+		d.h = 0;
+		d.hv = 0;
+		d.jet = 0;
 		d.checkpoint = 1;
 		d.lap = 0;
 		pl.model.position.set(d.x, 0.6, d.y);
@@ -1118,6 +1144,8 @@ function applyRestart(it, pos){
 		me.start = {x: clampNum(pos[me.id].x, -1000, 1000, 0), y: clampNum(pos[me.id].y, -1000, 1000, 0)};
 	dashEnergy = 1;
 	dashLocked = false;
+	jetFuel = 1;
+	jetLocked = false;
 	snapCamera = true;
 	votes = {};
 	myVote = false;
@@ -1152,6 +1180,7 @@ function startRound(it){
 	countDown.style.lineHeight = "";
 	countDown.innerHTML = "3";
 	lap.innerHTML = gameMode == "tag" ? fmtTime(tagTime) : "1/" + LAPS;
+	lapText = null;
 	if(gameMode == "tag"){
 		tagEndsAt = Date.now() + 3000 + tagTime * 1000;
 		if(it && players[it]){
@@ -1175,6 +1204,26 @@ function startRound(it){
 	}, 4000));
 }
 
+function setPods(pl, on){
+	if(on && !pl.pods){
+		if(!podGeo){
+			podGeo = new THREE.BoxBufferGeometry(0.4, 0.4, 0.4);
+			podMat = new THREE.MeshLambertMaterial({color: new THREE.Color("#888888")});
+		}
+		pl.pods = [];
+		for(var sd = -1; sd <= 1; sd += 2){
+			var pod = new THREE.Mesh(podGeo, podMat);
+			pod.position.set(0.7 * sd, 0.1, 0);
+			pl.model.add(pod);
+			pl.pods.push(pod);
+		}
+	}else if(!on && pl.pods){
+		for(var i = 0; i < pl.pods.length; i++)
+			pl.model.remove(pl.pods[i]);
+		pl.pods = null;
+	}
+}
+
 function startRace(c, it){
 	if(gameStarted)
 		return;
@@ -1183,6 +1232,7 @@ function startRace(c, it){
 	LAPS = c.laps;
 	speedMul = c.speed / 100;
 	tagTime = c.time;
+	jetpacks = c.jetpacks;
 	closeSettings();
 	var info = document.getElementsByClassName("info")[0];
 	if(info)
@@ -1213,6 +1263,29 @@ function startRace(c, it){
 	pb.innerHTML = (hostLike() ? "" : "<svg viewBox='0 0 24 24'><path d='M4 5h16v11H9l-5 4z' fill='none' stroke='currentColor' stroke-width='2' stroke-linejoin='round'/></svg>") + "<div class='badge' id='badge'></div>";
 	pb.addEventListener("click", togglePanel);
 	f.appendChild(pb);
+	for(var pid in players)
+		setPods(players[pid], jetpacks);
+	if(jetpacks){
+		var fuel = document.createElement("DIV");
+		fuel.id = "fuel";
+		fuel.className = "title";
+		fuel.innerHTML = "<div id='fuellabel'>Fuel</div><div id='fuelbar'><div id='fuelfill'></div></div>";
+		f.appendChild(fuel);
+		fuelFill = document.getElementById("fuelfill");
+		var fuelBar = document.getElementById("fuelbar");
+		var jetOn = function(e){
+			e.preventDefault();
+			jetTouch = true;
+		};
+		var jetOff = function(){
+			jetTouch = false;
+		};
+		fuelBar.addEventListener("touchstart", jetOn);
+		fuelBar.addEventListener("touchend", jetOff);
+		fuelBar.addEventListener("touchcancel", jetOff);
+		fuelBar.addEventListener("mousedown", jetOn);
+		window.addEventListener("mouseup", jetOff);
+	}
 	dashFill = document.getElementById("dashfill");
 	var dashBar = document.getElementById("dashbar");
 	function dashOn(e){
@@ -1469,7 +1542,58 @@ function joinGame(){
 
 var map, trees, signs, startc, main;
 
+function disposeGroup(g){
+	for(var i = 0; i < g.children.length; i++){
+		if(g.children[i].geometry)
+			g.children[i].geometry.dispose();
+	}
+}
+
+function setStatic(o){
+	o.updateMatrix();
+	o.matrixAutoUpdate = false;
+}
+
+function mergeStatic(list, material){
+	var pos = [], nor = [], idx = [], base = 0;
+	var v = new THREE.Vector3();
+	var nm = new THREE.Matrix3();
+	for(var i = 0; i < list.length; i++){
+		var m = list[i];
+		m.updateMatrix();
+		var g = m.geometry;
+		var p = g.attributes.position, n = g.attributes.normal, ix = g.index;
+		nm.getNormalMatrix(m.matrix);
+		for(var j = 0; j < p.count; j++){
+			v.set(p.getX(j), p.getY(j), p.getZ(j)).applyMatrix4(m.matrix);
+			pos.push(v.x, v.y, v.z);
+			v.set(n.getX(j), n.getY(j), n.getZ(j)).applyMatrix3(nm).normalize();
+			nor.push(v.x, v.y, v.z);
+		}
+		if(ix){
+			for(var k = 0; k < ix.count; k++)
+				idx.push(ix.getX(k) + base);
+		}else{
+			for(var q = 0; q < p.count; q++)
+				idx.push(base + q);
+		}
+		base += p.count;
+	}
+	var geo = new THREE.BufferGeometry();
+	geo.addAttribute("position", new THREE.BufferAttribute(new Float32Array(pos), 3));
+	geo.addAttribute("normal", new THREE.BufferAttribute(new Float32Array(nor), 3));
+	geo.setIndex(new THREE.BufferAttribute(base > 65535 ? new Uint32Array(idx) : new Uint16Array(idx), 1));
+	var mesh = new THREE.Mesh(geo, material);
+	mesh.matrixAutoUpdate = false;
+	return mesh;
+}
+
 function deleteMap(){
+	disposeGroup(map);
+	disposeGroup(trees);
+	disposeGroup(signs);
+	disposeGroup(startc);
+	disposeGroup(main);
 	while(map.children.length > 0)
 		map.remove(map.children[0]);
 	scene.remove(map);
@@ -1491,6 +1615,7 @@ function loadMap(){
 	var racedata = document.getElementById("trackcode").innerHTML.trim().split("|")[0].trim().split(" ");
 	var material = new THREE.MeshLambertMaterial({color: new THREE.Color(0xf48342)});
 	map = new THREE.Object3D();
+	var wallList = [];
 	for(var i = 0; i < racedata.length; i++){
 		if(racedata[i] == "")
 			continue;
@@ -1511,10 +1636,12 @@ function loadMap(){
 		wall.castShadow = true;
 		wall.receiveShadow = true;
 		map.add(wall);
+		wallList.push(wall);
 	}
 	scene.add(map);
 
 	trees = new THREE.Object3D();
+	var treeList = [];
 	var tree = new THREE.Mesh(
 		new THREE.CylinderBufferGeometry(0, 4, 15),
 		new THREE.MeshLambertMaterial({color: new THREE.Color("#1bad2c")})
@@ -1529,11 +1656,15 @@ function loadMap(){
 		t.scale.set(s, s, s);
 		t.castShadow = true;
 		t.receiveShadow = true;
-		trees.add(t);
+		treeList.push(t);
 	}
+	if(treeList.length)
+		trees.add(mergeStatic(treeList, tree.material));
+	setStatic(trees);
 	scene.add(trees);
 
 	signs = new THREE.Object3D();
+	var signList = [];
 	var sign = new THREE.Mesh(
 		new THREE.ConeBufferGeometry(0.7, 2, 5),
 		new THREE.MeshLambertMaterial({color: new THREE.Color("#f00")})
@@ -1548,8 +1679,11 @@ function loadMap(){
 		s.rotation.set(Math.PI / 2, parseInt(da[1]) / 180 * Math.PI, 0, "YXZ");
 		s.castShadow = true;
 		s.receiveShadow = true;
-		signs.add(s);
+		signList.push(s);
 	}
+	if(signList.length)
+		signs.add(mergeStatic(signList, sign.material));
+	setStatic(signs);
 	scene.add(signs);
 
 	var startdata = document.getElementById("trackcode").innerHTML.trim().split("|")[1].trim().split(" ");
@@ -1573,9 +1707,19 @@ function loadMap(){
 		wall.receiveShadow = true;
 		startc.add(wall);
 	}
+	for(var sc = 0; sc < startc.children.length; sc++)
+		setStatic(startc.children[sc]);
+	setStatic(startc);
 	scene.add(startc);
 
 	main = new THREE.Object3D();
+
+	if(wallList.length)
+		main.add(mergeStatic(wallList, material));
+	for(var wi = 0; wi < wallList.length; wi++)
+		setStatic(wallList[wi]);
+	map.visible = false;
+	setStatic(map);
 
 	var stripes = new THREE.TextureLoader().load("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAACCAYAAACZgbYnAAAAEklEQVQYV2NgYGD4z/D/////AA/6BPwHejn9AAAAAElFTkSuQmCC");
 	stripes.magFilter = THREE.NearestFilter;
@@ -1588,19 +1732,22 @@ function loadMap(){
 	);
 	ground.rotation.set(-Math.PI / 2, 0, 0);
 	ground.receiveShadow = true;
+	setStatic(ground);
 	main.add(ground);
 
+	var cubeGeo = new THREE.BoxBufferGeometry(100, 100, 100);
+	var cubeMat = new THREE.MeshLambertMaterial({color: new THREE.Color("#888"), side: THREE.DoubleSide});
+	var cubes = [];
 	for(var i = 0; i < 100; i++){
-		var cube = new THREE.Mesh(
-			new THREE.BoxBufferGeometry(100, 100, 100),
-			new THREE.MeshLambertMaterial({color: new THREE.Color("#888"), side: THREE.DoubleSide})
-		);
+		var cube = new THREE.Mesh(cubeGeo, cubeMat);
 		var dist = Math.random() * MOUNTAIN_DIST + MOUNTAIN_DIST;
 		var dir = Math.random() * Math.PI * 2;
 		cube.position.set(dist * Math.sin(dir), 0, dist * Math.cos(dir));
 		cube.rotation.set(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2);
-		main.add(cube);
+		cubes.push(cube);
 	}
+	main.add(mergeStatic(cubes, cubeMat));
+	setStatic(main);
 	scene.add(main);
 
 	return document.getElementById("trackcode").innerText.trim().split("|")[4];
@@ -1645,14 +1792,11 @@ function join(){
 
 	var x = 0;
 	var ray = new THREE.Raycaster();
-	function toXYCoords(pos){
-		pos = pos.clone();
-		pos.y += 0.5;
-		var vector = pos.project(camera);
-		vector.x = (vector.x + 1) / 2 * window.innerWidth;
-		vector.y = -(vector.y - 1) / 2 * window.innerHeight;
-		return vector;
-	}
+	var frustum = new THREE.Frustum();
+	var frustumMat = new THREE.Matrix4();
+	var labelVec = new THREE.Vector3();
+	var camTarget = new THREE.Vector3();
+	var lastFov = null, lastAspect = null;
 	var windowsize = {x: window.innerWidth, y: window.innerHeight};
 
 	var ray = new THREE.Raycaster();
@@ -1690,7 +1834,30 @@ function join(){
 					dashLocked = true;
 			}else
 				dashEnergy = Math.min(1, dashEnergy + DASH_REGEN * warp);
-			dashFill.style.width = dashEnergy * 100 + "%";
+			var dw = Math.round(dashEnergy * 200) / 2;
+			if(dw !== lastDashW){
+				dashFill.style.width = dw + "%";
+				lastDashW = dw;
+			}
+
+			me.data.jet = 0;
+			if(jetpacks){
+				if(jetLocked && jetFuel >= 0.2)
+					jetLocked = false;
+				var wantJet = (jetKey || jetTouch) && !gameSortaStarted;
+				me.data.jet = wantJet && !jetLocked && jetFuel > 0 ? 1 : 0;
+				if(me.data.jet){
+					jetFuel = Math.max(0, jetFuel - JET_DRAIN * warp);
+					if(jetFuel == 0)
+						jetLocked = true;
+				}else
+					jetFuel = Math.min(1, jetFuel + ((me.data.h || 0) > 0 ? JET_REGEN_AIR : JET_REGEN) * warp);
+				var fw = Math.round(jetFuel * 200) / 2;
+				if(fw !== lastFuelW){
+					fuelFill.style.height = fw + "%";
+					lastFuelW = fw;
+				}
+			}
 
 			players[me.id].data = me.data;
 
@@ -1729,11 +1896,33 @@ function join(){
 						play.model.children[0].rotation.z = Math.PI / 2 - play.data.steer;
 						play.model.children[1].rotation.z = Math.PI / 2 - play.data.steer;
 
-						for(var w in map.children){
-							var wall = map.children[w];
-							var posi = new THREE.Vector2(play.data.x, play.data.y);
-							if(Math.abs(wall.plane.distanceToPoint(play.model.position.clone().sub(wall.position))) < WALL_SIZE){
-								if(wall.position.clone().distanceTo(play.model.position) < wall.width / 2){
+						if(jetpacks){
+							var pd = play.data;
+							pd.h = pd.h || 0;
+							pd.hv = pd.hv || 0;
+							if(pd.jet)
+								pd.hv += (JET_RISE * speedMul - pd.hv) * (1 - Math.pow(0.9, warp));
+							else
+								pd.hv = Math.max(pd.hv - JET_GRAV * speedMul * warp, -JET_RISE * speedMul * 1.5);
+							pd.h = Math.min(JET_MAXH, pd.h + pd.hv * warp);
+							if(pd.h <= 0){
+								pd.h = 0;
+								pd.hv = Math.max(0, pd.hv);
+							}
+							play.model.position.y = 0.6 + pd.h;
+						}
+
+						var wl = map.children;
+						var wc = play.data.h > WALL_CLEAR ? 0 : wl.length;
+						var mpx = play.model.position.x, mpy = play.model.position.y, mpz = play.model.position.z;
+						for(var w = 0; w < wc; w++){
+							var wall = wl[w];
+							var wpos = wall.position;
+							var wn = wall.plane.normal;
+							var ax = play.data.x, ay = play.data.y;
+							var ddx = mpx - wpos.x, ddy = mpy - wpos.y, ddz = mpz - wpos.z;
+							if(Math.abs(wn.x * ddx + wn.y * ddy + wn.z * ddz) < WALL_SIZE){
+								if(Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz) < wall.width / 2){
 									var vel = new THREE.Vector3(play.data.xv, 0, play.data.yv);
 									vel.reflect(wall.plane.normal);
 									play.data.xv = vel.x + BOUNCE_CORRECT * wall.plane.normal.x * Math.sign(wall.plane.normal.dot(play.model.position.clone().sub(wall.position)));
@@ -1746,7 +1935,9 @@ function join(){
 									play.data.yv *= BOUNCE;
 								}
 							}
-							if(posi.distanceTo(wall.p1) < WALL_SIZE + 0.1){
+							var e1x = ax - wall.p1.x, e1y = ay - wall.p1.y;
+							if(e1x * e1x + e1y * e1y < ENDPOINT_SQ){
+								var posi = new THREE.Vector2(ax, ay);
 								var norm = posi.clone().sub(wall.p1);
 								norm = new THREE.Vector3(norm.x, 0, norm.y);
 								norm.normalize();
@@ -1761,7 +1952,9 @@ function join(){
 								play.data.xv *= BOUNCE;
 								play.data.yv *= BOUNCE;
 							}
-							if(posi.distanceTo(wall.p2) < WALL_SIZE + 0.1){
+							var e2x = ax - wall.p2.x, e2y = ay - wall.p2.y;
+							if(e2x * e2x + e2y * e2y < ENDPOINT_SQ){
+								var posi = new THREE.Vector2(ax, ay);
 								var norm = posi.clone().sub(wall.p2);
 								norm = new THREE.Vector3(norm.x, 0, norm.y);
 								norm.normalize();
@@ -1778,10 +1971,12 @@ function join(){
 							}
 						}
 
-						for(var i in startc.children){
+						for(var i = 0; i < startc.children.length; i++){
 							var cp = startc.children[i];
-							if(Math.abs(cp.plane.distanceToPoint(play.model.position.clone().sub(cp.position))) < 1){
-								if(cp.position.clone().distanceTo(play.model.position) < cp.width / 2 + 1){
+							var cdx = mpx - cp.position.x, cdy = mpy - cp.position.y, cdz = mpz - cp.position.z;
+							var cn = cp.plane.normal;
+							if(Math.abs(cn.x * cdx + cn.y * cdy + cn.z * cdz) < 1){
+								if(Math.sqrt(cdx * cdx + cdy * cdy + cdz * cdz) < cp.width / 2 + 1){
 									if(i == 0){
 										if(play.data.checkpoint == 1){
 											play.data.checkpoint = 0;
@@ -1827,7 +2022,7 @@ function join(){
 							}
 						}
 
-						if(play.model.position.distanceTo(new THREE.Vector3()) > OOB_DIST){
+						if(Math.sqrt(mpx * mpx + mpy * mpy + mpz * mpz) > OOB_DIST){
 							play.data.x = 0;
 							play.data.y = 0;
 						}
@@ -1840,29 +2035,32 @@ function join(){
 			}
 
 			var viewSign = frontView ? -1 : 1;
-			var target = new THREE.Vector3(
+			var camY = 3 + (jetpacks ? me.data.h || 0 : 0);
+			camTarget.set(
 				me.model.position.x + Math.sin(-me.model.rotation.y) * 5 * viewSign,
-				3,
+				camY,
 				me.model.position.z + -Math.cos(-me.model.rotation.y) * 5 * viewSign
 			);
 			if(snapCamera){
-				camera.position.set(target.x, 3, target.z);
+				camera.position.set(camTarget.x, camY, camTarget.z);
 				snapCamera = false;
 			}
+			var lagK = Math.pow(CAMERA_LAG, warp);
 			camera.position.set(
-				camera.position.x * Math.pow(CAMERA_LAG, warp) + target.x * (1 - Math.pow(CAMERA_LAG, warp)),
-				3,
-				camera.position.z * Math.pow(CAMERA_LAG, warp) + target.z * (1 - Math.pow(CAMERA_LAG, warp))
+				camera.position.x * lagK + camTarget.x * (1 - lagK),
+				camera.position.y * lagK + camY * (1 - lagK),
+				camera.position.z * lagK + camTarget.z * (1 - lagK)
 			);
 			camera.lookAt(me.model.position);
 			camera.fov += ((me.data.dash ? DASH_FOV : BASE_FOV) - camera.fov) * (1 - Math.pow(0.9, warp));
 
 			sendMe();
 
-			if(gameMode == "tag")
-				lap.innerHTML = fmtTime(Math.min(tagTime, Math.max(0, Math.ceil((tagEndsAt - Date.now()) / 1000))));
-			else
-				lap.innerHTML = me.data.lap <= LAPS ? me.data.lap + "/" + LAPS : "";
+			var lapNow = gameMode == "tag" ? fmtTime(Math.min(tagTime, Math.max(0, Math.ceil((tagEndsAt - Date.now()) / 1000)))) : me.data.lap <= LAPS ? me.data.lap + "/" + LAPS : "";
+			if(lapNow !== lapText){
+				lap.innerHTML = lapNow;
+				lapText = lapNow;
+			}
 		}else{
 			camera.position.set(50 * Math.sin(x), 20, 50 * Math.cos(x));
 			camera.lookAt(player.position);
@@ -1872,19 +2070,34 @@ function join(){
 
 		camera.updateMatrix();
 		camera.updateMatrixWorld();
-		camera.updateProjectionMatrix();
-		var frustum = new THREE.Frustum();
-		frustum.setFromMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+		if(camera.fov !== lastFov || camera.aspect !== lastAspect){
+			camera.updateProjectionMatrix();
+			lastFov = camera.fov;
+			lastAspect = camera.aspect;
+		}
+		frustumMat.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+		frustum.setFromMatrix(frustumMat);
+		var halfW = window.innerWidth / 2, halfH = window.innerHeight / 2;
 		for(var i = 0; i < labels.length; i++){
 			var label = labels[i];
 			if(frustum.containsPoint(label.position)){
-				var vec = toXYCoords(label.position);
-				label.style.left = vec.x + "px";
-				label.style.top = vec.y + "px";
-				label.style.zIndex = 99999 - Math.floor(camera.position.distanceTo(label.position) * 10);
-				label.style.display = "inline-block";
-			}else
+				labelVec.copy(label.position);
+				labelVec.y += 0.5;
+				labelVec.project(camera);
+				label.style.transform = "translate(" + Math.round((labelVec.x + 1) * halfW) + "px," + Math.round((1 - labelVec.y) * halfH) + "px) translate(-50%, -100%)";
+				var zi = 99999 - Math.floor(camera.position.distanceTo(label.position) * 10);
+				if(label.zc !== zi){
+					label.style.zIndex = zi;
+					label.zc = zi;
+				}
+				if(!label.vis){
+					label.style.display = "inline-block";
+					label.vis = true;
+				}
+			}else if(label.vis !== false){
 				label.style.display = "none";
+				label.vis = false;
+			}
 		}
 
 		if(windowsize.x != window.innerWidth || windowsize.y != window.innerHeight){
@@ -1950,6 +2163,8 @@ window.onkeydown = function(e){
 		right = true;
 	if(e.keyCode == 69)
 		dashKey = true;
+	if(e.keyCode == 84)
+		jetKey = true;
 	if(e.keyCode == 70 && gameStarted && !e.repeat)
 		toggleView();
 	if(e.keyCode == 82 && gameStarted && !gameSortaStarted && !e.repeat)
@@ -1967,6 +2182,8 @@ window.onkeyup = function(e){
 		right = false;
 	if(e.keyCode == 69)
 		dashKey = false;
+	if(e.keyCode == 84)
+		jetKey = false;
 	if(e.keyCode == 32)
 		brakeKey = false;
 }
