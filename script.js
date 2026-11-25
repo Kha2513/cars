@@ -51,7 +51,7 @@ window.addEventListener("scroll", function(){
 var camera, renderer, scene, renderer2, scene2, labels = [];
 scene = new THREE.Scene();
 renderer = new THREE.WebGLRenderer();
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setPixelRatio(gfxPixelRatio());
 renderer.setSize(window.innerWidth, window.innerHeight);
 var mobile = navigator.userAgent.match("Mobile")!=null||navigator.userAgent.match("Linux;")!=null;
 if(!mobile){
@@ -81,6 +81,9 @@ function toggleFullScreen() {
 var name, code, players = {}, me = {}, gameStarted = false, gameSortaStarted = false, left = false, right = false, lap;
 var gameMode = "race", gameOver = false, speedMul = 1, tagTime = 120, tagEndsAt = 0, runnersAtStart = 0, roleEl, roleTimer;
 var TAG_DIST = 2.3;
+var TAG_GRACE = 3000;
+var tagGraceUntil = 0;
+var sceneryList = [];
 var CFG_LIMITS = {laps: [1, 20, 1], speed: [10, 300, 10], time: [30, 600, 15]};
 var cfg = {mode: "race", laps: LAPS, speed: 100, time: 120, jetpacks: false};
 var brakeKey = false;
@@ -825,17 +828,31 @@ function finishTag(w){
 
 function checkTags(){
 	var ids = Object.keys(players);
+	var anyIt = false;
+	for(var n = 0; n < ids.length; n++){
+		if(players[ids[n]].it){
+			anyIt = true;
+			break;
+		}
+	}
+	if(!anyIt && ids.length > 1){
+		var pick = ids[Math.floor(Math.random() * ids.length)];
+		tagPlayer(pick);
+		broadcast({t: "tag", id: pick});
+	}
 	var tagged = [];
-	for(var i = 0; i < ids.length; i++){
-		var a = players[ids[i]];
-		if(!a.it)
-			continue;
-		for(var j = 0; j < ids.length; j++){
-			var b = players[ids[j]];
-			if(b.it || tagged.indexOf(ids[j]) >= 0)
+	if(Date.now() >= tagGraceUntil){
+		for(var i = 0; i < ids.length; i++){
+			var a = players[ids[i]];
+			if(!a.it)
 				continue;
-			if(a.model.position.distanceTo(b.model.position) < TAG_DIST)
-				tagged.push(ids[j]);
+			for(var j = 0; j < ids.length; j++){
+				var b = players[ids[j]];
+				if(b.it || tagged.indexOf(ids[j]) >= 0)
+					continue;
+				if(a.model.position.distanceTo(b.model.position) < TAG_DIST)
+					tagged.push(ids[j]);
+			}
 		}
 	}
 	for(var k = 0; k < tagged.length; k++){
@@ -1183,6 +1200,7 @@ function startRound(it){
 	lapText = null;
 	if(gameMode == "tag"){
 		tagEndsAt = Date.now() + 3000 + tagTime * 1000;
+		tagGraceUntil = Date.now() + 3000 + TAG_GRACE;
 		if(it && players[it]){
 			players[it].it = true;
 			setOutline(players[it], true);
@@ -1549,6 +1567,22 @@ function disposeGroup(g){
 	}
 }
 
+function sceneryMesh(m){
+	m.visible = gfx.scenery;
+	sceneryList.push(m);
+	return m;
+}
+
+function applyGfx(){
+	renderer.setPixelRatio(gfxPixelRatio());
+	renderer.setSize(window.innerWidth, window.innerHeight);
+	for(var i = 0; i < sceneryList.length; i++)
+		sceneryList[i].visible = gfx.scenery;
+	var el = document.getElementById("fps");
+	if(el)
+		el.style.display = gfx.showFps ? "block" : "none";
+}
+
 function setStatic(o){
 	o.updateMatrix();
 	o.matrixAutoUpdate = false;
@@ -1589,6 +1623,7 @@ function mergeStatic(list, material){
 }
 
 function deleteMap(){
+	sceneryList = [];
 	disposeGroup(map);
 	disposeGroup(trees);
 	disposeGroup(signs);
@@ -1659,7 +1694,7 @@ function loadMap(){
 		treeList.push(t);
 	}
 	if(treeList.length)
-		trees.add(mergeStatic(treeList, tree.material));
+		trees.add(sceneryMesh(mergeStatic(treeList, tree.material)));
 	setStatic(trees);
 	scene.add(trees);
 
@@ -1735,18 +1770,27 @@ function loadMap(){
 	setStatic(ground);
 	main.add(ground);
 
-	var cubeGeo = new THREE.BoxBufferGeometry(100, 100, 100);
-	var cubeMat = new THREE.MeshLambertMaterial({color: new THREE.Color("#888"), side: THREE.DoubleSide});
-	var cubes = [];
-	for(var i = 0; i < 100; i++){
-		var cube = new THREE.Mesh(cubeGeo, cubeMat);
-		var dist = Math.random() * MOUNTAIN_DIST + MOUNTAIN_DIST;
-		var dir = Math.random() * Math.PI * 2;
-		cube.position.set(dist * Math.sin(dir), 0, dist * Math.cos(dir));
-		cube.rotation.set(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2);
-		cubes.push(cube);
+	var msat = Math.round(Math.max(18, sat * 0.55));
+	var rings = [
+		{count: 28, minDist: 400, spread: 90, minH: 110, spreadH: 90, minR: 60, spreadR: 50, light: 66},
+		{count: 34, minDist: 260, spread: 120, minH: 55, spreadH: 70, minR: 45, spreadR: 40, light: 44}
+	];
+	for(var ri = 0; ri < rings.length; ri++){
+		var ring = rings[ri];
+		var peaks = [];
+		var peakMat = new THREE.MeshLambertMaterial({color: new THREE.Color("hsl(" + color + ", " + msat + "%, " + ring.light + "%)")});
+		for(var pi = 0; pi < ring.count; pi++){
+			var ph = ring.minH + Math.random() * ring.spreadH;
+			var pr = ring.minR + Math.random() * ring.spreadR;
+			var peak = new THREE.Mesh(new THREE.ConeBufferGeometry(pr, ph, 5), peakMat);
+			var pdist = ring.minDist + Math.random() * ring.spread;
+			var pang = (pi + Math.random() * 0.8) / ring.count * Math.PI * 2;
+			peak.position.set(pdist * Math.sin(pang), ph / 2 - 2, pdist * Math.cos(pang));
+			peak.rotation.set(0, Math.random() * Math.PI * 2, 0);
+			peaks.push(peak);
+		}
+		main.add(sceneryMesh(mergeStatic(peaks, peakMat)));
 	}
-	main.add(mergeStatic(cubes, cubeMat));
 	setStatic(main);
 	scene.add(main);
 
@@ -1797,6 +1841,7 @@ function join(){
 	var labelVec = new THREE.Vector3();
 	var camTarget = new THREE.Vector3();
 	var lastFov = null, lastAspect = null;
+	var fpsEl = document.getElementById("fps"), fpsFrames = 0, fpsLast = performance.now();
 	var windowsize = {x: window.innerWidth, y: window.innerHeight};
 
 	var ray = new THREE.Raycaster();
@@ -1808,6 +1853,17 @@ function join(){
 	var lastTime = performance.now();
 	function render(timestamp) {
 		requestAnimationFrame(render);
+		if(gfx.fps && timestamp - lastTime < 1000 / gfx.fps - 2)
+			return;
+		if(gfx.showFps){
+			fpsFrames++;
+			if(timestamp - fpsLast >= 500){
+				if(fpsEl)
+					fpsEl.textContent = Math.round(fpsFrames * 1000 / (timestamp - fpsLast)) + " fps";
+				fpsFrames = 0;
+				fpsLast = timestamp;
+			}
+		}
 		var timepassed = timestamp - lastTime;
 		lastTime = timestamp;
 		var warp = timepassed / 16;
@@ -1867,6 +1923,7 @@ function join(){
 					fastest = Math.max(fastest, Math.hypot(players[q].data.xv, players[q].data.yv) || 0);
 				var steps = Math.min(8, Math.max(1, Math.ceil(fastest * warp / 0.6)));
 				var fullWarp = warp;
+				var tagHold = gameMode == "tag" && Date.now() < tagGraceUntil;
 				warp = fullWarp / steps;
 				for(var st = 0; st < steps; st++){
 					for(var p in players){
@@ -1874,7 +1931,10 @@ function join(){
 
 						play.data.dir += play.data.steer / 10 * warp;
 
-						if(play.data.brake){
+						if(tagHold && play.it){
+							play.data.xv = 0;
+							play.data.yv = 0;
+						}else if(play.data.brake){
 							play.data.xv *= Math.pow(BRAKE_DRAG, warp);
 							play.data.yv *= Math.pow(BRAKE_DRAG, warp);
 						}else{
@@ -2080,7 +2140,7 @@ function join(){
 		var halfW = window.innerWidth / 2, halfH = window.innerHeight / 2;
 		for(var i = 0; i < labels.length; i++){
 			var label = labels[i];
-			if(frustum.containsPoint(label.position)){
+			if(gfx.names && frustum.containsPoint(label.position)){
 				labelVec.copy(label.position);
 				labelVec.y += 0.5;
 				labelVec.project(camera);
@@ -2192,3 +2252,5 @@ document.body.onkeydown = function(e){
 	if(e.keyCode == 73 && (e.ctrlKey || e.metaKey))
 		document.getElementById("trackcode").innerText = prompt("Track data?")
 }
+
+applyGfx();
