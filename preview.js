@@ -104,11 +104,11 @@ function drawCarPreview(ctx, w, h, item, ang){
 	ctx.clearRect(0, 0, w, h);
 	var sa = Math.sin(ang), ca = Math.cos(ang);
 	var pitch = 0.45, sp = Math.sin(pitch), cp = Math.cos(pitch);
-	var S = Math.min(w, h * 1.5) / 3.3;
+	var S = Math.min(w * 0.32, h * 0.41);
 	function proj(x, y, z){
 		var rx = x * ca + z * sa;
 		var rz = -x * sa + z * ca;
-		return [w / 2 + rx * S, h * 0.58 - (y * cp - rz * sp) * S, y * sp + rz * cp];
+		return [w / 2 + rx * S, h / 2 - (y * cp - rz * sp) * S, y * sp + rz * cp];
 	}
 	var FACES = [
 		{n: [0, 0, 1], k: "front", p: [[-1, 1, 1], [1, 1, 1], [1, -1, 1], [-1, -1, 1]]},
@@ -168,13 +168,19 @@ function drawCarPreview(ctx, w, h, item, ang){
 
 function previewVisible(item){
 	var r = item.canvas.getBoundingClientRect();
-	if(r.bottom < 0 || r.top > window.innerHeight)
+	if(!r.width && !r.height)
 		return false;
-	var box = item.canvas.parentNode && item.canvas.parentNode.parentNode;
-	if(box && box.id && /list$/.test(box.id)){
-		var lr = box.getBoundingClientRect();
-		if(r.bottom < lr.top || r.top > lr.bottom)
-			return false;
+	if(r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth)
+		return false;
+	var el = item.canvas.parentNode;
+	while(el && el !== document.body){
+		if(el.id && /list$/.test(el.id)){
+			var lr = el.getBoundingClientRect();
+			if(r.bottom < lr.top || r.top > lr.bottom)
+				return false;
+			break;
+		}
+		el = el.parentNode;
 	}
 	return true;
 }
@@ -190,14 +196,18 @@ function previewFrame(now){
 	previewItems = live;
 	if(!live.length)
 		return;
-	if(now - previewLast >= 33){
+	if(!document.hidden && now - previewLast >= 33){
 		previewLast = now;
 		for(var j = 0; j < live.length; j++){
 			var it = live[j];
+			var animate = typeof gfx == "undefined" || gfx.previews !== false;
+			if(!animate && it.drawn)
+				continue;
 			if(!previewVisible(it))
 				continue;
+			it.drawn = true;
 			var ctx = it.canvas.getContext("2d");
-			var ang = now / 1000 * 0.9 + it.off;
+			var ang = animate ? now / 1000 * 0.9 + it.off : it.off;
 			if(it.kind == "car")
 				drawCarPreview(ctx, it.canvas.width, it.canvas.height, it, ang);
 			else
