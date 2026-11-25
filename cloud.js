@@ -1,5 +1,5 @@
 (function(){
-	var cloud = window.cloud = {enabled: false, ready: false, user: null, profile: null, isAdmin: false, isOwner: false, notice: "", listeners: []};
+	var cloud = window.cloud = {enabled: false, ready: false, user: null, profile: null, isAdmin: false, isOwner: false, notice: "", renamedAt: 0, banner: null, listeners: [], bannerListeners: []};
 	var OWNER = "kha2513";
 	var EMAIL_DOMAIN = "@cars.invalid";
 	var ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -14,6 +14,16 @@
 		if(cloud.ready)
 			fn(cloud.user, cloud.profile);
 	};
+
+	cloud.onBanner = function(fn){
+		cloud.bannerListeners.push(fn);
+		fn(cloud.banner);
+	};
+
+	function emitBanner(){
+		for(var i = 0; i < cloud.bannerListeners.length; i++)
+			cloud.bannerListeners[i](cloud.banner);
+	}
 
 	cloud.cleanTrack = function(v){
 		var t = String(v == null ? "" : v).replace(/<br\s*\/?>/gi, "").trim();
@@ -94,6 +104,8 @@
 			out.name = p.name.substring(0, 50);
 		if(typeof p.bio == "string")
 			out.bio = p.bio.substring(0, 140);
+		if(typeof p.style == "string")
+			out.style = p.style.replace(/[^A-Za-z0-9 #,.:;%()\n\-]/g, "").substring(0, 400);
 		if(isFinite(p.color))
 			out.color = Math.min(360, Math.max(0, Math.round(p.color)));
 		if(isFinite(p.sat))
@@ -226,7 +238,7 @@
 
 	function userOf(snap){
 		var d = snap.data();
-		return {id: snap.id, username: d.username, name: d.name || "", bio: d.bio || "", color: d.color, sat: d.sat, light: d.light, face: d.face || null, side: d.side || null, admin: d.admin === true || d.usernameLower == OWNER, owner: d.usernameLower == OWNER, banned: d.banned === true, deleted: d.deleted === true};
+		return {id: snap.id, username: d.username, name: d.name || "", bio: d.bio || "", style: d.style || "", color: d.color, sat: d.sat, light: d.light, face: d.face || null, side: d.side || null, admin: d.admin === true || d.usernameLower == OWNER, owner: d.usernameLower == OWNER, banned: d.banned === true, deleted: d.deleted === true};
 	}
 
 	cloud.users = function(){
@@ -250,6 +262,88 @@
 				out.push(trackOf(s));
 			});
 			return newestFirst(out);
+		}).catch(fail);
+	};
+
+	cloud.setAdmin = function(uid, on){
+		return db.collection("users").doc(uid).set({admin: !!on, updated: stamp()}, {merge: true}).catch(fail);
+	};
+
+	cloud.clearProfile = function(uid){
+		return db.collection("users").doc(uid).set({bio: "", style: "", face: null, side: null, updated: stamp()}, {merge: true}).catch(fail);
+	};
+
+	cloud.allTracks = function(){
+		return db.collection("tracks").limit(200).get().then(function(q){
+			var out = [];
+			q.forEach(function(s){
+				out.push(trackOf(s));
+			});
+			return newestFirst(out);
+		}).catch(fail);
+	};
+
+	cloud.setBanner = function(b){
+		var text = String(b && b.text != null ? b.text : "").trim().substring(0, 200);
+		var kind = b && (b.kind == "warn" || b.kind == "alert") ? b.kind : "info";
+		if(!cloud.user)
+			return Promise.reject(new Error("Log in first."));
+		return db.collection("config").doc("banner").set({text: text, kind: kind, enabled: !!(b && b.enabled) && text.length > 0, by: cloud.user.username, updated: stamp()}).catch(fail);
+	};
+
+	cloud.rename = function(newName, code){
+		var n = cleanName(newName);
+		if(!n)
+			return Promise.reject(new Error("Usernames are 3 to 16 letters, numbers or underscores."));
+		if(!cloud.user || !auth.currentUser)
+			return Promise.reject(new Error("Log in first."));
+		if(cloud.isOwner || n.toLowerCase() == OWNER)
+			return Promise.reject(new Error("That name is reserved."));
+		var left = cloud.renamedAt + 604800000 - Date.now();
+		if(left > 0)
+			return Promise.reject(new Error("You can change your name again in " + Math.ceil(left / 86400000) + " day(s)."));
+		var old = cloud.user.username;
+		if(n == old)
+			return Promise.reject(new Error("That is already your name."));
+		var u = auth.currentUser;
+		var oldEmail = u.email;
+		var newEmail = n.toLowerCase() + EMAIL_DOMAIN;
+		var emailChanged = false;
+		var cred = firebase.auth.EmailAuthProvider.credential(oldEmail, normCode(code));
+		return u.reauthenticateWithCredential(cred).then(function(){
+			if(newEmail == oldEmail)
+				return null;
+			return u.updateEmail(newEmail).then(function(){
+				emailChanged = true;
+			});
+		}).then(function(){
+			var doc = {username: n, usernameLower: n.toLowerCase(), renamedAt: stamp(), updated: stamp()};
+			if(cloud.profile && cloud.profile.name && cloud.profile.name.toLowerCase() == old.toLowerCase())
+				doc.name = n;
+			return db.collection("users").doc(u.uid).set(doc, {merge: true}).catch(function(e){
+				if(emailChanged)
+					return u.updateEmail(oldEmail).then(function(){
+						throw e;
+					}, function(){
+						throw e;
+					});
+				throw e;
+			});
+		}).then(function(){
+			return db.collection("tracks").where("ownerId", "==", u.uid).get();
+		}).then(function(q){
+			var batch = db.batch();
+			q.forEach(function(s){
+				batch.set(s.ref, {ownerName: n, updated: stamp()}, {merge: true});
+			});
+			return batch.commit();
+		}).then(function(){
+			cloud.user = {uid: u.uid, username: n};
+			cloud.renamedAt = Date.now();
+			if(cloud.profile && cloud.profile.name && cloud.profile.name.toLowerCase() == old.toLowerCase())
+				cloud.profile.name = n;
+			emit();
+			return n;
 		}).catch(fail);
 	};
 
@@ -333,6 +427,12 @@
 		});
 	};
 
+	db.collection("config").doc("banner").onSnapshot(function(snap){
+		var d = snap.exists ? snap.data() : null;
+		cloud.banner = d && d.enabled === true && typeof d.text == "string" && d.text ? {text: d.text.substring(0, 200), kind: d.kind == "warn" || d.kind == "alert" ? d.kind : "info", by: d.by || ""} : null;
+		emitBanner();
+	}, function(){});
+
 	auth.onAuthStateChanged(function(user){
 		if(registering)
 			return;
@@ -361,6 +461,7 @@
 				cloud.profile = cleanProfile(d);
 				cloud.isOwner = d.usernameLower == OWNER;
 				cloud.isAdmin = d.admin === true || cloud.isOwner;
+				cloud.renamedAt = d.renamedAt && d.renamedAt.toMillis ? d.renamedAt.toMillis() : 0;
 			}else{
 				cloud.user = {uid: user.uid, username: fallback};
 				cloud.profile = null;
